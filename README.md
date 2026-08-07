@@ -1,115 +1,190 @@
 # DinePilot
 
-Microservices-based restaurant management system built with Spring Boot, Spring Cloud, MongoDB, and RabbitMQ.
+DinePilot is a restaurant-management backend built as a set of Spring Boot microservices. It currently covers identity, restaurant and menu management, customer carts, ordering, and the kitchen fulfillment workflow.
 
-## Status
+## Project status
 
-**Phases 1–3** are complete: Eureka, API Gateway, `common` library, User Service (auth/profile/addresses), and Restaurant Service (restaurants/categories/menu/tables). Reservation, Order, and Billing services are not implemented yet.
+Phases 1-3 and Phase 5 are complete. Reservation and Billing services remain planned work.
 
-## Modules
-
-| Module | Description | Port |
-|---|---|---|
-| `common` | Shared library: `ApiResponse` envelope, `BaseEntity`, `Role` enum, exceptions, global exception handler, JWT validation | — |
-| `eureka-server` | Service registry / discovery | 8761 |
-| `api-gateway` | Edge routing, CORS, request logging | 8080 |
-| `user-service` | Registration, JWT login/refresh/logout, profile, addresses | 8081 |
-| `restaurant-service` | Restaurant/category/menu/table CRUD | 8082 |
+| Module | Responsibility | Port |
+|---|---|---:|
+| `common` | API responses, shared entities, exceptions, roles, JWT validation | - |
+| `eureka-server` | Service registration and discovery | 8761 |
+| `api-gateway` | Public routing, CORS, and request logging | 8080 |
+| `user-service` | Authentication, profiles, addresses, kitchen assignment | 8081 |
+| `restaurant-service` | Restaurants, categories, menu items, and tables | 8082 |
+| `order-service` | Customer carts, orders, and kitchen workflow | 8084 |
 
 ## Roles
 
-`CUSTOMER` (default on self-registration), `RESTAURANT_ADMIN`, `KITCHEN`, `SUPER_ADMIN`. JWTs carry the role as a claim; each service enforces authorization itself (no central auth gateway yet — see `common`'s `JwtAuthenticationFilter`). There's no admin-provisioning endpoint yet, so promoting a user to `RESTAURANT_ADMIN`/`SUPER_ADMIN` currently means editing their document in `user_db.users` directly.
+- `CUSTOMER` is the default role created through public registration.
+- `RESTAURANT_ADMIN` manages restaurant resources and can assign kitchen staff.
+- `KITCHEN` sees and processes orders for one assigned restaurant.
+- `SUPER_ADMIN` has elevated management access.
+
+Access tokens contain the user ID and role. Tokens issued to assigned kitchen users also contain `restaurantId`. Services validate authorization themselves through the shared JWT filter.
+
+There is not yet a public role-promotion endpoint. Development environments can promote a user by updating the role in `user_db.users`. After changing a role or kitchen assignment, sign in again or refresh the token so its claims reflect the new user record.
 
 ## API overview
 
-All endpoints are reachable through the gateway at `http://localhost:8080`, or directly against each service's own port. Responses are wrapped in `{ success, message, data, timestamp }`.
+All APIs are available through `http://localhost:8080`. A service can also be called directly through its own port while developing.
 
-**User Service** (`user-service`, public unless noted)
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/api/auth/register` | always creates a `CUSTOMER` |
-| POST | `/api/auth/login` | |
-| POST | `/api/auth/refresh` | rotates the refresh token |
-| POST | `/api/auth/logout` | revokes the refresh token |
-| GET / PUT | `/api/users/me` | requires auth |
-| GET / POST | `/api/users/me/addresses` | requires auth |
-| PUT / DELETE | `/api/users/me/addresses/{id}` | requires auth |
+Responses use the shared envelope:
 
-**Restaurant Service** (`restaurant-service`)
-| Method | Path | Notes |
+```json
+{
+  "success": true,
+  "message": "OK",
+  "data": {},
+  "timestamp": "2026-08-08T12:00:00Z"
+}
+```
+
+### User Service
+
+| Method | Path | Access |
 |---|---|---|
-| GET | `/api/restaurants`, `/api/restaurants/{id}` | public |
-| POST | `/api/restaurants` | requires `RESTAURANT_ADMIN` |
-| PUT / DELETE | `/api/restaurants/{id}` | owner or `SUPER_ADMIN` only |
-| GET | `/api/categories?restaurantId=` | public |
-| POST / PUT / DELETE | `/api/categories` | owner only |
-| GET | `/api/menu?restaurantId=&categoryId=&available=&q=` | public search/filter |
-| POST / PUT / DELETE | `/api/menu` | owner only |
-| PATCH | `/api/menu/{id}/availability` | owner only |
-| GET | `/api/tables?restaurantId=` | public |
-| POST / PUT / DELETE | `/api/tables` | owner only |
-| PATCH | `/api/tables/{id}/status` | owner only |
+| POST | `/api/auth/register` | Public |
+| POST | `/api/auth/login` | Public |
+| POST | `/api/auth/refresh` | Public |
+| POST | `/api/auth/logout` | Public |
+| GET / PUT | `/api/users/me` | Authenticated user |
+| GET / POST | `/api/users/me/addresses` | Authenticated user |
+| PUT / DELETE | `/api/users/me/addresses/{id}` | Authenticated user |
+| PATCH | `/api/users/{userId}/kitchen-restaurant` | Restaurant or super admin |
+
+### Restaurant Service
+
+| Method | Path | Access |
+|---|---|---|
+| GET | `/api/restaurants`, `/api/restaurants/{id}` | Public |
+| POST | `/api/restaurants` | Restaurant admin |
+| PUT / DELETE | `/api/restaurants/{id}` | Owner or super admin |
+| GET | `/api/categories?restaurantId=` | Public |
+| POST / PUT / DELETE | `/api/categories` | Restaurant owner |
+| GET | `/api/menu?restaurantId=&categoryId=&available=&q=` | Public |
+| GET | `/api/menu/{id}` | Public |
+| POST / PUT / DELETE | `/api/menu` | Restaurant owner |
+| PATCH | `/api/menu/{id}/availability` | Restaurant owner |
+| GET | `/api/tables?restaurantId=` | Public |
+| POST / PUT / DELETE | `/api/tables` | Restaurant owner |
+| PATCH | `/api/tables/{id}/status` | Restaurant owner |
+
+### Order Service
+
+| Method | Path | Access and behavior |
+|---|---|---|
+| GET | `/api/cart` | Customer's active cart |
+| POST | `/api/cart/items` | Customer; validates the live menu item |
+| PUT | `/api/cart/items/{foodId}` | Customer; changes quantity |
+| DELETE | `/api/cart/items/{foodId}` | Customer; removes a line |
+| POST | `/api/orders` | Customer; snapshots and clears the cart |
+| GET | `/api/orders` | Customer's newest-first order history |
+| GET | `/api/orders/{id}` | Owning customer |
+| PATCH | `/api/orders/{id}/cancel` | Owning customer while `PLACED` |
+| GET | `/api/kitchen/orders` | Kitchen staff for assigned restaurant |
+| PATCH | `/api/kitchen/orders/{id}/accept` | `PLACED` to `PREPARING` |
+| PATCH | `/api/kitchen/orders/{id}/preparing` | Alias for accepting a placed order |
+| PATCH | `/api/kitchen/orders/{id}/ready` | `PREPARING` to `READY` |
+| PATCH | `/api/kitchen/orders/{id}/completed` | `READY` to `COMPLETED` |
+
+Phase 5 keeps food names and prices as immutable order snapshots. A later menu edit therefore cannot change an existing order. Carts also reject items from a second restaurant, and kitchen queries never accept a restaurant ID from the request; they derive it from the signed token instead.
+
+Read [the Phase 5 implementation guide](docs/phase-5-order-service.md) for the full design, flows, examples, edge cases, and test strategy.
 
 ## Prerequisites
 
 - JDK 17
-- Docker + Docker Compose
-- No local Maven install needed — use the bundled wrapper (`./mvnw` / `mvnw.cmd`)
+- Docker Desktop with Docker Compose
+- No separate Maven installation is required
 
-## Running everything with Docker Compose
+## Run with Docker Compose
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+docker compose ps
+```
+
+Bash:
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
+docker compose ps
 ```
 
-This starts MongoDB, RabbitMQ, Eureka Server, API Gateway, User Service, and Restaurant Service.
+Useful URLs:
 
 - Eureka dashboard: http://localhost:8761
 - API Gateway health: http://localhost:8080/actuator/health
 - User Service: http://localhost:8081
 - Restaurant Service: http://localhost:8082
-- RabbitMQ management UI: http://localhost:15672 (user/pass from `.env`)
+- Order Service: http://localhost:8084
+- RabbitMQ management: http://localhost:15672
 
-Stop everything with `docker compose down` (add `-v` to also drop data volumes).
+Stop the stack without deleting data:
 
-### Using MongoDB Atlas instead of the local container
-
-`user-service` and `restaurant-service` each read their database connection from `MONGO_URI_USER_SERVICE` / `MONGO_URI_RESTAURANT_SERVICE` in `.env`. Point both at the **same Atlas cluster**, changing only the database name in the URI path (`user_db`, `restaurant_db`) — that keeps the project's database-per-service design while sharing one cluster. Get the base connection string from Atlas → Database → Connect → Drivers, then set:
-
+```bash
+docker compose down
 ```
+
+Add `-v` only when you intentionally want to delete local MongoDB and RabbitMQ volumes.
+
+## MongoDB configuration
+
+The checked-in `.env.example` works with the local MongoDB container. Each service has its own logical database:
+
+- `user_db`
+- `restaurant_db`
+- `order_db`
+
+To use Atlas, point all three URIs at the same deployment and change only the database name:
+
+```dotenv
 MONGO_URI_USER_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/user_db?retryWrites=true&w=majority
 MONGO_URI_RESTAURANT_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/restaurant_db?retryWrites=true&w=majority
+MONGO_URI_ORDER_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/order_db?retryWrites=true&w=majority
 ```
 
-`docker compose up` will use Atlas automatically once these are set — the local `mongodb` container stays defined in `docker-compose.yml` but nothing depends on it.
+Use one sufficiently long `JWT_SECRET` across every service. Different secrets make a token issued by User Service invalid elsewhere.
 
-## Running a service locally (without Docker)
+## Run services locally
 
-```bash
-./mvnw -pl eureka-server -am spring-boot:run
+Start Eureka first, then the gateway, followed by business services:
+
+```powershell
+.\mvnw.cmd -pl eureka-server -am spring-boot:run
+.\mvnw.cmd -pl api-gateway -am spring-boot:run
+.\mvnw.cmd -pl user-service -am spring-boot:run
+.\mvnw.cmd -pl restaurant-service -am spring-boot:run
+.\mvnw.cmd -pl order-service -am spring-boot:run
 ```
 
-Or from an IDE, run the module's `*Application` main class directly. Start `eureka-server` first, then `api-gateway`, then the business services.
+When services run on the host, set `MONGO_URI` to a host-reachable address such as `localhost:27017`. The Compose hostname `mongodb` only resolves inside the Compose network.
 
-`user-service` and `restaurant-service` need `MONGO_URI` and `JWT_SECRET` — either export them before running, or edit the defaults baked into each module's `application.yml`:
+## Build and test
 
-```bash
-export MONGO_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/user_db?retryWrites=true&w=majority"
-export JWT_SECRET="<same secret across every service>"
-./mvnw -pl user-service -am spring-boot:run
+Run the complete reactor:
+
+```powershell
+.\mvnw.cmd clean test
 ```
 
-## Building all modules
+Run only Phase 5 and its shared dependency:
 
-```bash
-./mvnw clean install
+```powershell
+.\mvnw.cmd -pl order-service -am test
 ```
+
+The Phase 5 tests focus on business rules without requiring MongoDB, Eureka, or another running service. Repositories and the synchronous menu client are mocked at unit boundaries.
 
 ## Next phases
 
-- **Reservation Service** — table availability, booking, cancellation, history
-- **Order Service** — cart, orders, kitchen workflow
-- **Billing Service** — invoices, simulated payments, receipts
-- **Event-driven wiring** — RabbitMQ producers/consumers connecting the above (`ReservationCreated`, `OrderCreated`, `PaymentCompleted`, `OrderCompleted`); RabbitMQ is already running in `docker-compose.yml`, just unused so far
-- **Quality & deployment** — Swagger/OpenAPI per service, structured logging, full compose coverage, Postman collection, unit/integration tests
+- Reservation Service: availability, booking, cancellation, and history
+- Billing Service: invoices, simulated payments, and receipts
+- RabbitMQ events connecting reservation, order, kitchen, and billing activity
+- OpenAPI documentation, integration tests, observability, and deployment hardening
