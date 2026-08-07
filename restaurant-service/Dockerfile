@@ -8,7 +8,8 @@ COPY restaurant-service/pom.xml restaurant-service/pom.xml
 COPY eureka-server/pom.xml eureka-server/pom.xml
 COPY api-gateway/pom.xml api-gateway/pom.xml
 COPY user-service/pom.xml user-service/pom.xml
-RUN chmod +x mvnw
+COPY order-service/pom.xml order-service/pom.xml
+RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 
 COPY common/src common/src
 COPY restaurant-service/src restaurant-service/src
