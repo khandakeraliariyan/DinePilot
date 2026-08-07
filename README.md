@@ -16,6 +16,40 @@ Microservices-based restaurant management system built with Spring Boot, Spring 
 | `user-service` | Registration, JWT login/refresh/logout, profile, addresses | 8081 |
 | `restaurant-service` | Restaurant/category/menu/table CRUD | 8082 |
 
+## Roles
+
+`CUSTOMER` (default on self-registration), `RESTAURANT_ADMIN`, `KITCHEN`, `SUPER_ADMIN`. JWTs carry the role as a claim; each service enforces authorization itself (no central auth gateway yet — see `common`'s `JwtAuthenticationFilter`). There's no admin-provisioning endpoint yet, so promoting a user to `RESTAURANT_ADMIN`/`SUPER_ADMIN` currently means editing their document in `user_db.users` directly.
+
+## API overview
+
+All endpoints are reachable through the gateway at `http://localhost:8080`, or directly against each service's own port. Responses are wrapped in `{ success, message, data, timestamp }`.
+
+**User Service** (`user-service`, public unless noted)
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/auth/register` | always creates a `CUSTOMER` |
+| POST | `/api/auth/login` | |
+| POST | `/api/auth/refresh` | rotates the refresh token |
+| POST | `/api/auth/logout` | revokes the refresh token |
+| GET / PUT | `/api/users/me` | requires auth |
+| GET / POST | `/api/users/me/addresses` | requires auth |
+| PUT / DELETE | `/api/users/me/addresses/{id}` | requires auth |
+
+**Restaurant Service** (`restaurant-service`)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/restaurants`, `/api/restaurants/{id}` | public |
+| POST | `/api/restaurants` | requires `RESTAURANT_ADMIN` |
+| PUT / DELETE | `/api/restaurants/{id}` | owner or `SUPER_ADMIN` only |
+| GET | `/api/categories?restaurantId=` | public |
+| POST / PUT / DELETE | `/api/categories` | owner only |
+| GET | `/api/menu?restaurantId=&categoryId=&available=&q=` | public search/filter |
+| POST / PUT / DELETE | `/api/menu` | owner only |
+| PATCH | `/api/menu/{id}/availability` | owner only |
+| GET | `/api/tables?restaurantId=` | public |
+| POST / PUT / DELETE | `/api/tables` | owner only |
+| PATCH | `/api/tables/{id}/status` | owner only |
+
 ## Prerequisites
 
 - JDK 17
@@ -74,4 +108,8 @@ export JWT_SECRET="<same secret across every service>"
 
 ## Next phases
 
-See the project development plan: Reservation Service → Order Service → Billing Service → event-driven wiring via RabbitMQ → Swagger/logging/tests/Docker polish.
+- **Reservation Service** — table availability, booking, cancellation, history
+- **Order Service** — cart, orders, kitchen workflow
+- **Billing Service** — invoices, simulated payments, receipts
+- **Event-driven wiring** — RabbitMQ producers/consumers connecting the above (`ReservationCreated`, `OrderCreated`, `PaymentCompleted`, `OrderCompleted`); RabbitMQ is already running in `docker-compose.yml`, just unused so far
+- **Quality & deployment** — Swagger/OpenAPI per service, structured logging, full compose coverage, Postman collection, unit/integration tests
