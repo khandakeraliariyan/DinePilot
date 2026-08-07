@@ -23,5 +23,7 @@ public class User extends BaseEntity {
 
     private Role role = Role.CUSTOMER;
 
+    private String restaurantId;
+
     private boolean enabled = true;
 }

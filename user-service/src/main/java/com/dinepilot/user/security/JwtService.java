@@ -30,15 +30,17 @@ public class JwtService {
         return accessTokenExpirationMs;
     }
 
-    public String generateAccessToken(String userId, String email, Role role) {
+    public String generateAccessToken(String userId, String email, Role role, String restaurantId) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(userId)
                 .claim("email", email)
                 .claim("role", role.name())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)))
-                .signWith(signingKey)
-                .compact();
+                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
+        if (restaurantId != null && !restaurantId.isBlank()) {
+            builder.claim("restaurantId", restaurantId);
+        }
+        return builder.signWith(signingKey).compact();
     }
 }

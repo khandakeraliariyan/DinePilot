@@ -1,6 +1,8 @@
 package com.dinepilot.user.service;
 
 import com.dinepilot.common.exception.ResourceNotFoundException;
+import com.dinepilot.common.exception.ConflictException;
+import com.dinepilot.common.enums.Role;
 import com.dinepilot.user.dto.UpdateProfileRequest;
 import com.dinepilot.user.dto.UserProfileResponse;
 import com.dinepilot.user.entity.User;
@@ -28,12 +30,23 @@ public class UserService {
         return toResponse(user);
     }
 
+    public UserProfileResponse assignKitchenRestaurant(String userId, String restaurantId) {
+        User user = findUser(userId);
+        if (user.getRole() != Role.KITCHEN) {
+            throw new ConflictException("Restaurant assignment is only valid for KITCHEN users");
+        }
+        user.setRestaurantId(restaurantId);
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
     private User findUser(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     private UserProfileResponse toResponse(User user) {
-        return new UserProfileResponse(user.getId(), user.getEmail(), user.getFullName(), user.getPhone(), user.getRole());
+        return new UserProfileResponse(user.getId(), user.getEmail(), user.getFullName(), user.getPhone(),
+                user.getRole(), user.getRestaurantId());
     }
 }

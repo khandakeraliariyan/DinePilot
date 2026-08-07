@@ -7,6 +7,7 @@ public record UserProfileResponse(
         String email,
         String fullName,
         String phone,
-        Role role
+        Role role,
+        String restaurantId
 ) {
 }

@@ -94,7 +94,8 @@ public class AuthService {
     }
 
     private AuthResponse issueTokens(User user) {
-        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+        String accessToken = jwtService.generateAccessToken(
+                user.getId(), user.getEmail(), user.getRole(), user.getRestaurantId());
 
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
