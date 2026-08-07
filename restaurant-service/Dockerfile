@@ -5,6 +5,9 @@ COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 COPY common/pom.xml common/pom.xml
 COPY restaurant-service/pom.xml restaurant-service/pom.xml
+COPY eureka-server/pom.xml eureka-server/pom.xml
+COPY api-gateway/pom.xml api-gateway/pom.xml
+COPY user-service/pom.xml user-service/pom.xml
 RUN chmod +x mvnw
 
 COPY common/src common/src
