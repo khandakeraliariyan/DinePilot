@@ -1,8 +1,6 @@
 package com.dinepilot.user.security;
 
 import com.dinepilot.common.enums.Role;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,13 +40,5 @@ public class JwtService {
                 .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)))
                 .signWith(signingKey)
                 .compact();
-    }
-
-    public Claims parseAndValidate(String token) throws JwtException {
-        return Jwts.parser()
-                .verifyWith(signingKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
     }
 }

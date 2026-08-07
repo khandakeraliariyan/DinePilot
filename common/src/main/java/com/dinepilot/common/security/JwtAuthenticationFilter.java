@@ -1,4 +1,4 @@
-package com.dinepilot.user.security;
+package com.dinepilot.common.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -19,10 +19,10 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
+    private final JwtValidator jwtValidator;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
-        this.jwtService = jwtService;
+    public JwtAuthenticationFilter(JwtValidator jwtValidator) {
+        this.jwtValidator = jwtValidator;
     }
 
     @Override
@@ -36,7 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
             try {
-                Claims claims = jwtService.parseAndValidate(token);
+                Claims claims = jwtValidator.parseAndValidate(token);
                 String userId = claims.getSubject();
                 String role = claims.get("role", String.class);
 
