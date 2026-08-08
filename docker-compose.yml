@@ -94,6 +94,23 @@ services:
     ports:
       - "${ORDER_SERVICE_PORT:-8084}:8084"
 
+  reservation-service:
+    build:
+      context: .
+      dockerfile: reservation-service/Dockerfile
+    container_name: dinepilot-reservation-service
+    restart: unless-stopped
+    environment:
+      EUREKA_HOST: eureka-server
+      MONGO_URI: ${MONGO_URI_RESERVATION_SERVICE:-mongodb://dinepilot:dinepilot@mongodb:27017/reservation_db?authSource=admin}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - eureka-server
+      - mongodb
+      - restaurant-service
+    ports:
+      - "${RESERVATION_SERVICE_PORT:-8083}:8083"
+
 volumes:
   mongo-data:
   rabbitmq-data:

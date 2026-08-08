@@ -13,11 +13,11 @@ COPY reservation-service/pom.xml reservation-service/pom.xml
 RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 
 COPY common/src common/src
-COPY order-service/src order-service/src
-RUN ./mvnw -q -pl common,order-service -am -DskipTests clean package
+COPY reservation-service/src reservation-service/src
+RUN ./mvnw -q -pl common,reservation-service -am -DskipTests clean package
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=build /workspace/order-service/target/order-service.jar app.jar
-EXPOSE 8084
+COPY --from=build /workspace/reservation-service/target/reservation-service.jar app.jar
+EXPOSE 8083
 ENTRYPOINT ["java", "-jar", "app.jar"]

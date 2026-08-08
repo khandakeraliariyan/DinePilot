@@ -9,6 +9,7 @@ COPY api-gateway/pom.xml api-gateway/pom.xml
 COPY user-service/pom.xml user-service/pom.xml
 COPY restaurant-service/pom.xml restaurant-service/pom.xml
 COPY order-service/pom.xml order-service/pom.xml
+COPY reservation-service/pom.xml reservation-service/pom.xml
 RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 
 COPY common/src common/src

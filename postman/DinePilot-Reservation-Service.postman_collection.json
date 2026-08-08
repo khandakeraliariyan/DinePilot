@@ -1,0 +1,489 @@
+{
+  "info": {
+    "_postman_id": "d1ne9110-4a53-4b7c-8f4d-reserv4t10npc1",
+    "name": "DinePilot - Reservation Service (Phase 4)",
+    "description": "End-to-end flow for DinePilot's Reservation Service, run through the API gateway (http://localhost:8080). Run requests top-to-bottom (or use Collection Runner) — each request captures what the next one needs into collection variables automatically. The only manual step is promoting the restaurant-admin user's role in MongoDB after registering it (there's no public role-promotion endpoint yet); instructions are in that request's description.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "customerToken", "value": "", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "restaurantId", "value": "", "type": "string" },
+    { "key": "tableId", "value": "", "type": "string" },
+    { "key": "reservationId", "value": "", "type": "string" },
+    { "key": "reservationId2", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('registration succeeded', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});",
+                  "pm.collectionVariables.set('customerToken', json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@dinepilot.test\",\n  \"password\": \"password123\",\n  \"fullName\": \"Cara Customer\",\n  \"phone\": \"555-1000\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Registration always creates a CUSTOMER by default. Also logs the customer in immediately (response includes a usable accessToken), so no separate login call is strictly required for the customer — but a 'Login Customer' request is included below in case the token expires (15 min) during testing."
+          }
+        },
+        {
+          "name": "Register Restaurant Admin (then promote in Mongo!)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('registration succeeded', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@dinepilot.test\",\n  \"password\": \"password123\",\n  \"fullName\": \"Rana Admin\",\n  \"phone\": \"555-2000\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "IMPORTANT MANUAL STEP: this account is created as a CUSTOMER (that's the only role public registration can create). Before running 'Login Restaurant Admin' below, promote this user's role to RESTAURANT_ADMIN directly in MongoDB — there is no public promotion endpoint (by design, per the project README).\n\nRun this in a terminal:\n\ndocker exec dinepilot-mongodb mongosh \"mongodb://dinepilot:dinepilot@localhost:27017/user_db?authSource=admin\" --eval 'db.users.updateOne({email:\"admin@dinepilot.test\"}, {$set:{role:\"RESTAURANT_ADMIN\"}})'\n\nThen run 'Login Restaurant Admin' — the JWT it issues will carry the updated RESTAURANT_ADMIN role."
+          }
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('login succeeded', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.collectionVariables.set('customerToken', json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@dinepilot.test\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Login Restaurant Admin (run AFTER promoting role in Mongo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('login succeeded', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.collectionVariables.set('adminToken', json.data.accessToken);",
+                  "",
+                  "// Decode the JWT payload just to confirm the role really is RESTAURANT_ADMIN.",
+                  "const payload = JSON.parse(atob(json.data.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+                  "pm.test('token role is RESTAURANT_ADMIN', function () {",
+                  "    pm.expect(payload.role).to.equal('RESTAURANT_ADMIN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@dinepilot.test\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "If the 'token role is RESTAURANT_ADMIN' test fails, you skipped (or mistyped) the mongosh promotion step on the previous request — the role only updates for tokens issued *after* the Mongo update."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Restaurant Setup (Admin)",
+      "item": [
+        {
+          "name": "Create Restaurant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('restaurant created', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.collectionVariables.set('restaurantId', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"The Test Bistro\",\n  \"description\": \"A place to verify reservations\",\n  \"address\": {\n    \"line1\": \"1 Main St\",\n    \"city\": \"Testville\",\n    \"state\": \"TS\",\n    \"postalCode\": \"00000\",\n    \"country\": \"Testland\"\n  },\n  \"openingHours\": [],\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/restaurants"
+          }
+        },
+        {
+          "name": "Create Table (capacity 4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('table created', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "    pm.expect(json.data.status).to.equal('AVAILABLE');",
+                  "});",
+                  "pm.collectionVariables.set('tableId', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": \"{{restaurantId}}\",\n  \"tableNumber\": \"T1\",\n  \"capacity\": 4\n}"
+            },
+            "url": "{{baseUrl}}/api/tables"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Reservations (Customer)",
+      "item": [
+        {
+          "name": "Book Reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('reservation created as PENDING', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "    pm.expect(json.data.status).to.equal('PENDING');",
+                  "    pm.expect(json.data.restaurantId).to.equal(pm.collectionVariables.get('restaurantId'));",
+                  "});",
+                  "pm.collectionVariables.set('reservationId', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableId\": \"{{tableId}}\",\n  \"partySize\": 2,\n  \"reservedFor\": \"2026-09-01T19:00:00Z\",\n  \"notes\": \"Anniversary dinner\"\n}"
+            },
+            "url": "{{baseUrl}}/api/reservations",
+            "description": "restaurantId is intentionally NOT part of the request body — the service derives it server-side from the table you're booking, so a client can never send a mismatched restaurant/table pair. reservedFor must be in the future or you'll get a 400 validation error."
+          }
+        },
+        {
+          "name": "Get My Reservation History",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{customerToken}}" } ],
+            "url": "{{baseUrl}}/api/reservations"
+          }
+        },
+        {
+          "name": "Get Reservation By Id",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{customerToken}}" } ],
+            "url": "{{baseUrl}}/api/reservations/{{reservationId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Reservations (Restaurant Admin)",
+      "item": [
+        {
+          "name": "List Reservations For My Restaurant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('list returned', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+            "url": "{{baseUrl}}/api/reservations/restaurant/{{restaurantId}}"
+          }
+        },
+        {
+          "name": "Confirm Reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('confirmed', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "    pm.expect(json.data.status).to.equal('CONFIRMED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+            "url": "{{baseUrl}}/api/reservations/restaurant/{{reservationId}}/confirm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Cancel (Customer)",
+      "item": [
+        {
+          "name": "Cancel My Confirmed Reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('cancelled', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "    pm.expect(json.data.status).to.equal('CANCELLED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Authorization", "value": "Bearer {{customerToken}}" } ],
+            "url": "{{baseUrl}}/api/reservations/{{reservationId}}/cancel",
+            "description": "Cancellation is allowed while the reservation is PENDING or CONFIRMED. Run this again afterward and you should get a 409 Conflict, since CANCELLED is a terminal state."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Negative Tests",
+      "item": [
+        {
+          "name": "Book Second Reservation (for negative tests)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('booked', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.collectionVariables.set('reservationId2', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableId\": \"{{tableId}}\",\n  \"partySize\": 2,\n  \"reservedFor\": \"2026-09-02T19:00:00Z\"\n}"
+            },
+            "url": "{{baseUrl}}/api/reservations"
+          }
+        },
+        {
+          "name": "Double-Book Same Table/Time -> expect 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected as conflict', function () {",
+                  "    pm.expect(pm.response.code).to.equal(409);",
+                  "});",
+                  "pm.test('message explains why', function () {",
+                  "    pm.expect(pm.response.json().message).to.equal('Table is already reserved for the requested time');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableId\": \"{{tableId}}\",\n  \"partySize\": 2,\n  \"reservedFor\": \"2026-09-02T19:30:00Z\"\n}"
+            },
+            "url": "{{baseUrl}}/api/reservations",
+            "description": "Same table, and 19:30 falls inside the 90-minute slot booked at 19:00 by the previous request. Should be rejected."
+          }
+        },
+        {
+          "name": "Party Size Exceeds Capacity -> expect 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected as conflict', function () {",
+                  "    pm.expect(pm.response.code).to.equal(409);",
+                  "});",
+                  "pm.test('message explains why', function () {",
+                  "    pm.expect(pm.response.json().message).to.equal('Party size exceeds table capacity');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableId\": \"{{tableId}}\",\n  \"partySize\": 10,\n  \"reservedFor\": \"2026-09-03T19:00:00Z\"\n}"
+            },
+            "url": "{{baseUrl}}/api/reservations",
+            "description": "The table's capacity is 4 (set in step 2); this books for 10."
+          }
+        },
+        {
+          "name": "Back-to-Back Booking Right After Prior Slot Ends -> expect 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('allowed, half-open interval', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableId\": \"{{tableId}}\",\n  \"partySize\": 2,\n  \"reservedFor\": \"2026-09-02T20:30:00Z\"\n}"
+            },
+            "url": "{{baseUrl}}/api/reservations",
+            "description": "The 19:00 slot booked earlier ends at 20:30 (90-minute slots). A booking starting exactly at 20:30 should be allowed."
+          }
+        },
+        {
+          "name": "Customer Tries to Confirm (wrong role) -> expect 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('forbidden for CUSTOMER role', function () {",
+                  "    pm.expect(pm.response.code).to.equal(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Authorization", "value": "Bearer {{customerToken}}" } ],
+            "url": "{{baseUrl}}/api/reservations/restaurant/{{reservationId2}}/confirm",
+            "description": "Only RESTAURANT_ADMIN / SUPER_ADMIN can hit /api/reservations/restaurant/**. A customer's token should be rejected by @PreAuthorize before it ever reaches the service layer."
+          }
+        }
+      ]
+    }
+  ]
+}

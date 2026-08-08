@@ -4,7 +4,7 @@ DinePilot is a restaurant-management backend built as a set of Spring Boot micro
 
 ## Project status
 
-Phases 1-3 and Phase 5 are complete. Reservation and Billing services remain planned work.
+Phases 1-5 are complete. Billing service remains planned work.
 
 | Module | Responsibility | Port |
 |---|---|---:|
@@ -13,6 +13,7 @@ Phases 1-3 and Phase 5 are complete. Reservation and Billing services remain pla
 | `api-gateway` | Public routing, CORS, and request logging | 8080 |
 | `user-service` | Authentication, profiles, addresses, kitchen assignment | 8081 |
 | `restaurant-service` | Restaurants, categories, menu items, and tables | 8082 |
+| `reservation-service` | Table availability, booking, cancellation, and history | 8083 |
 | `order-service` | Customer carts, orders, and kitchen workflow | 8084 |
 
 ## Roles
@@ -71,6 +72,23 @@ Responses use the shared envelope:
 | POST / PUT / DELETE | `/api/tables` | Restaurant owner |
 | PATCH | `/api/tables/{id}/status` | Restaurant owner |
 
+### Reservation Service
+
+| Method | Path | Access and behavior |
+|---|---|---|
+| POST | `/api/reservations` | Customer; validates the table via restaurant-service and rejects overlapping bookings |
+| GET | `/api/reservations` | Customer's newest-first reservation history |
+| GET | `/api/reservations/{id}` | Owning customer |
+| PATCH | `/api/reservations/{id}/cancel` | Owning customer while `PENDING` or `CONFIRMED` |
+| GET | `/api/reservations/restaurant/{restaurantId}` | Owning restaurant admin or super admin |
+| PATCH | `/api/reservations/restaurant/{id}/confirm` | `PENDING` to `CONFIRMED` |
+| PATCH | `/api/reservations/restaurant/{id}/complete` | `CONFIRMED` to `COMPLETED` |
+| PATCH | `/api/reservations/restaurant/{id}/cancel` | `PENDING` or `CONFIRMED` to `CANCELLED` |
+
+Reservation Service reads restaurant-service synchronously (via Eureka-resolved `RestClient`, `lb://RESTAURANT-SERVICE`) to confirm a table exists and to read its capacity, and to confirm restaurant ownership when a restaurant admin views or manages their reservations. It does not currently push table-status changes back to restaurant-service; that side effect is deferred to the RabbitMQ event that will land with Phase 7, keeping the cross-service read synchronous and the cross-service reaction asynchronous.
+
+Read [the Phase 4 implementation guide](docs/phase-4-reservation-service.md) for the full design, flows, examples, edge cases, and test strategy.
+
 ### Order Service
 
 | Method | Path | Access and behavior |
@@ -123,6 +141,7 @@ Useful URLs:
 - API Gateway health: http://localhost:8080/actuator/health
 - User Service: http://localhost:8081
 - Restaurant Service: http://localhost:8082
+- Reservation Service: http://localhost:8083
 - Order Service: http://localhost:8084
 - RabbitMQ management: http://localhost:15672
 
@@ -140,13 +159,15 @@ The checked-in `.env.example` works with the local MongoDB container. Each servi
 
 - `user_db`
 - `restaurant_db`
+- `reservation_db`
 - `order_db`
 
-To use Atlas, point all three URIs at the same deployment and change only the database name:
+To use Atlas, point all four URIs at the same deployment and change only the database name:
 
 ```dotenv
 MONGO_URI_USER_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/user_db?retryWrites=true&w=majority
 MONGO_URI_RESTAURANT_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/restaurant_db?retryWrites=true&w=majority
+MONGO_URI_RESERVATION_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/reservation_db?retryWrites=true&w=majority
 MONGO_URI_ORDER_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/order_db?retryWrites=true&w=majority
 ```
 
@@ -161,6 +182,7 @@ Start Eureka first, then the gateway, followed by business services:
 .\mvnw.cmd -pl api-gateway -am spring-boot:run
 .\mvnw.cmd -pl user-service -am spring-boot:run
 .\mvnw.cmd -pl restaurant-service -am spring-boot:run
+.\mvnw.cmd -pl reservation-service -am spring-boot:run
 .\mvnw.cmd -pl order-service -am spring-boot:run
 ```
 
@@ -174,17 +196,17 @@ Run the complete reactor:
 .\mvnw.cmd clean test
 ```
 
-Run only Phase 5 and its shared dependency:
+Run only a single phase and its shared dependency:
 
 ```powershell
+.\mvnw.cmd -pl reservation-service -am test
 .\mvnw.cmd -pl order-service -am test
 ```
 
-The Phase 5 tests focus on business rules without requiring MongoDB, Eureka, or another running service. Repositories and the synchronous menu client are mocked at unit boundaries.
+Phase 4 and Phase 5 tests focus on business rules without requiring MongoDB, Eureka, or another running service. Repositories and the synchronous restaurant-service clients are mocked at unit boundaries.
 
 ## Next phases
 
-- Reservation Service: availability, booking, cancellation, and history
 - Billing Service: invoices, simulated payments, and receipts
 - RabbitMQ events connecting reservation, order, kitchen, and billing activity
 - OpenAPI documentation, integration tests, observability, and deployment hardening

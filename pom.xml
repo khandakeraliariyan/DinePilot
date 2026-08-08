@@ -31,6 +31,7 @@
         <module>user-service</module>
         <module>restaurant-service</module>
         <module>order-service</module>
+        <module>reservation-service</module>
     </modules>
 
     <properties>
