@@ -3,6 +3,8 @@ package com.dinepilot.reservation.service;
 import com.dinepilot.common.exception.ConflictException;
 import com.dinepilot.common.exception.ForbiddenException;
 import com.dinepilot.common.exception.ResourceNotFoundException;
+import com.dinepilot.common.event.EventFactory;
+import com.dinepilot.common.event.ReservationCreatedEvent;
 import com.dinepilot.reservation.client.RestaurantServiceClient;
 import com.dinepilot.reservation.dto.ReservationRequest;
 import com.dinepilot.reservation.dto.ReservationResponse;
@@ -10,6 +12,7 @@ import com.dinepilot.reservation.entity.Reservation;
 import com.dinepilot.reservation.enums.ReservationStatus;
 import com.dinepilot.reservation.repository.ReservationRepository;
 import org.springframework.security.core.Authentication;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -25,12 +28,14 @@ public class ReservationService {
     private final ReservationRepository reservations;
     private final RestaurantServiceClient restaurantClient;
     private final RestaurantAccessGuard restaurantAccessGuard;
+    private final RabbitTemplate rabbitTemplate;
 
     public ReservationService(ReservationRepository reservations, RestaurantServiceClient restaurantClient,
-                               RestaurantAccessGuard restaurantAccessGuard) {
+                               RestaurantAccessGuard restaurantAccessGuard, RabbitTemplate rabbitTemplate) {
         this.reservations = reservations;
         this.restaurantClient = restaurantClient;
         this.restaurantAccessGuard = restaurantAccessGuard;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public ReservationResponse book(String userId, ReservationRequest request) {
@@ -48,7 +53,9 @@ public class ReservationService {
         reservation.setReservedFor(request.reservedFor());
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setNotes(request.notes());
-        return toResponse(reservations.save(reservation));
+        Reservation saved = reservations.save(reservation);
+        publishCreated(saved);
+        return toResponse(saved);
     }
 
     public List<ReservationResponse> history(String userId) {
@@ -65,7 +72,9 @@ public class ReservationService {
         Reservation reservation = find(id);
         if (!reservation.getUserId().equals(userId)) throw new ForbiddenException("This reservation belongs to another customer");
         cancel(reservation);
-        return toResponse(reservations.save(reservation));
+        Reservation saved = reservations.save(reservation);
+        publishStatusChanged(saved);
+        return toResponse(saved);
     }
 
     public List<ReservationResponse> forRestaurant(Authentication authentication, String restaurantId) {
@@ -77,14 +86,18 @@ public class ReservationService {
         Reservation reservation = find(id);
         restaurantAccessGuard.checkManagesRestaurant(authentication, reservation.getRestaurantId());
         transition(reservation, ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
-        return toResponse(reservations.save(reservation));
+        Reservation saved = reservations.save(reservation);
+        publishStatusChanged(saved);
+        return toResponse(saved);
     }
 
     public ReservationResponse completeByRestaurant(Authentication authentication, String id) {
         Reservation reservation = find(id);
         restaurantAccessGuard.checkManagesRestaurant(authentication, reservation.getRestaurantId());
         transition(reservation, ReservationStatus.CONFIRMED, ReservationStatus.COMPLETED);
-        return toResponse(reservations.save(reservation));
+        Reservation saved = reservations.save(reservation);
+        publishStatusChanged(saved);
+        return toResponse(saved);
     }
 
     public ReservationResponse cancelByRestaurant(Authentication authentication, String id) {
@@ -128,5 +141,19 @@ public class ReservationService {
         return new ReservationResponse(reservation.getId(), reservation.getUserId(), reservation.getRestaurantId(),
                 reservation.getTableId(), reservation.getPartySize(), reservation.getReservedFor(),
                 reservation.getStatus(), reservation.getNotes(), reservation.getCreatedAt(), reservation.getUpdatedAt());
+    }
+
+    private void publishCreated(Reservation reservation) {
+        rabbitTemplate.convertAndSend("dinepilot.events", "reservation.created",
+                new ReservationCreatedEvent(EventFactory.eventId(), EventFactory.now(), reservation.getId(),
+                        reservation.getUserId(), reservation.getRestaurantId(), reservation.getTableId(),
+                        reservation.getReservedFor()));
+    }
+
+    private void publishStatusChanged(Reservation reservation) {
+        rabbitTemplate.convertAndSend("dinepilot.events", "reservation.status.changed",
+                new com.dinepilot.common.event.ReservationStatusChangedEvent(
+                        EventFactory.eventId(), EventFactory.now(), reservation.getId(),
+                        reservation.getRestaurantId(), reservation.getTableId(), reservation.getStatus().name()));
     }
 }

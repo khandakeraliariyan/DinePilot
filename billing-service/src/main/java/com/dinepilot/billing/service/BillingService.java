@@ -7,9 +7,12 @@ import com.dinepilot.billing.enums.InvoiceStatus;
 import com.dinepilot.billing.enums.PaymentStatus;
 import com.dinepilot.billing.repository.InvoiceRepository;
 import com.dinepilot.billing.repository.PaymentRepository;
+import com.dinepilot.common.event.EventFactory;
+import com.dinepilot.common.event.PaymentCompletedEvent;
 import com.dinepilot.common.exception.ConflictException;
 import com.dinepilot.common.exception.ForbiddenException;
 import com.dinepilot.common.exception.ResourceNotFoundException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -21,11 +24,13 @@ public class BillingService {
     private final OrderClient orderClient;
     private final InvoiceRepository invoiceRepository;
     private final PaymentRepository paymentRepository;
+    private final RabbitTemplate rabbitTemplate;
 
-    public BillingService(OrderClient orderClient, InvoiceRepository invoiceRepository, PaymentRepository paymentRepository) {
+    public BillingService(OrderClient orderClient, InvoiceRepository invoiceRepository, PaymentRepository paymentRepository, RabbitTemplate rabbitTemplate) {
         this.orderClient = orderClient;
         this.invoiceRepository = invoiceRepository;
         this.paymentRepository = paymentRepository;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public Invoice generateInvoice(String orderId, String requesterUserId, boolean elevated) {
@@ -40,6 +45,19 @@ public class BillingService {
         invoice.setStatus(InvoiceStatus.PENDING);
         invoice.setAmount(order.total());
         invoice.setReceiptNumber(null);
+        return invoiceRepository.save(invoice);
+    }
+
+    public Invoice generateInvoiceFromEvent(String orderId) {
+        invoiceRepository.findByOrderId(orderId).ifPresent(existing -> { throw new ConflictException("Invoice already exists for this order"); });
+        OrderClient.OrderSnapshot order = orderClient.getOrder(orderId);
+        if (!"COMPLETED".equalsIgnoreCase(order.status())) throw new ConflictException("Invoice can only be generated from a completed order");
+        Invoice invoice = new Invoice();
+        invoice.setOrderId(order.id());
+        invoice.setUserId(order.userId());
+        invoice.setRestaurantId(order.restaurantId());
+        invoice.setStatus(InvoiceStatus.PENDING);
+        invoice.setAmount(order.total());
         return invoiceRepository.save(invoice);
     }
 
@@ -60,6 +78,9 @@ public class BillingService {
         invoice.setStatus(InvoiceStatus.PAID);
         invoice.setReceiptNumber("R-" + payment.getProviderRef());
         invoiceRepository.save(invoice);
+        rabbitTemplate.convertAndSend("dinepilot.events", "payment.completed",
+                new PaymentCompletedEvent(EventFactory.eventId(), EventFactory.now(), payment.getId(), invoiceId,
+                        invoice.getOrderId(), invoice.getUserId(), invoice.getRestaurantId(), payment.getAmount()));
         return payment;
     }
 

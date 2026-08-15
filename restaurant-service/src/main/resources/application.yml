@@ -7,6 +7,11 @@ spring:
   data:
     mongodb:
       uri: ${MONGO_URI:mongodb://dinepilot:dinepilot@localhost:27017/restaurant_db?authSource=admin}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:dinepilot}
+    password: ${RABBITMQ_DEFAULT_PASS:dinepilot}
 
 jwt:
   secret: ${JWT_SECRET:HZ+XCLqA5NGg9IezhLOdOOqv2PUf1PB7fgMii0y/gR7stKUJ/24qBexjk5XC44Wd-dev-only}

@@ -16,6 +16,7 @@ public class Order extends BaseEntity {
     @Indexed private String userId;
     @Indexed private String restaurantId;
     @Indexed private OrderStatus status;
+    @Indexed private boolean paid;
     private List<OrderItem> items = new ArrayList<>();
     private BigDecimal total;
 }

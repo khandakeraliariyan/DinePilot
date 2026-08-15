@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -49,11 +50,14 @@ class OrderManagementServiceTest {
     @Mock
     private CartService cartService;
 
+    @Mock
+    private RabbitTemplate rabbitTemplate;
+
     private OrderManagementService service;
 
     @BeforeEach
     void setUp() {
-        service = new OrderManagementService(orders, cartService);
+        service = new OrderManagementService(orders, cartService, rabbitTemplate);
     }
 
     @Nested

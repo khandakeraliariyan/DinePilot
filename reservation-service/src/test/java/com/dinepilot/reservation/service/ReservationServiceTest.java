@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -54,11 +55,14 @@ class ReservationServiceTest {
     @Mock
     private RestaurantAccessGuard restaurantAccessGuard;
 
+    @Mock
+    private RabbitTemplate rabbitTemplate;
+
     private ReservationService service;
 
     @BeforeEach
     void setUp() {
-        service = new ReservationService(reservations, restaurantClient, restaurantAccessGuard);
+        service = new ReservationService(reservations, restaurantClient, restaurantAccessGuard, rabbitTemplate);
     }
 
     @Nested
