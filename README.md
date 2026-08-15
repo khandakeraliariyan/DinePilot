@@ -4,7 +4,7 @@ DinePilot is a restaurant-management backend built as a set of Spring Boot micro
 
 ## Project status
 
-Phases 1-5 are complete. Billing service remains planned work.
+Phases 1-7 are complete. Billing service and RabbitMQ event flow are implemented.
 
 | Module | Responsibility | Port |
 |---|---|---:|
@@ -15,6 +15,7 @@ Phases 1-5 are complete. Billing service remains planned work.
 | `restaurant-service` | Restaurants, categories, menu items, and tables | 8082 |
 | `reservation-service` | Table availability, booking, cancellation, and history | 8083 |
 | `order-service` | Customer carts, orders, and kitchen workflow | 8084 |
+| `billing-service` | Invoices, simulated payments, and receipts | 8085 |
 
 ## Roles
 
@@ -143,6 +144,7 @@ Useful URLs:
 - Restaurant Service: http://localhost:8082
 - Reservation Service: http://localhost:8083
 - Order Service: http://localhost:8084
+- Billing Service: http://localhost:8085
 - RabbitMQ management: http://localhost:15672
 
 Stop the stack without deleting data:
@@ -161,6 +163,7 @@ The checked-in `.env.example` works with the local MongoDB container. Each servi
 - `restaurant_db`
 - `reservation_db`
 - `order_db`
+- `billing_db`
 
 To use Atlas, point all four URIs at the same deployment and change only the database name:
 
@@ -169,6 +172,7 @@ MONGO_URI_USER_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/use
 MONGO_URI_RESTAURANT_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/restaurant_db?retryWrites=true&w=majority
 MONGO_URI_RESERVATION_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/reservation_db?retryWrites=true&w=majority
 MONGO_URI_ORDER_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/order_db?retryWrites=true&w=majority
+MONGO_URI_BILLING_SERVICE=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/billing_db?retryWrites=true&w=majority
 ```
 
 Use one sufficiently long `JWT_SECRET` across every service. Different secrets make a token issued by User Service invalid elsewhere.
@@ -184,6 +188,7 @@ Start Eureka first, then the gateway, followed by business services:
 .\mvnw.cmd -pl restaurant-service -am spring-boot:run
 .\mvnw.cmd -pl reservation-service -am spring-boot:run
 .\mvnw.cmd -pl order-service -am spring-boot:run
+.\mvnw.cmd -pl billing-service -am spring-boot:run
 ```
 
 When services run on the host, set `MONGO_URI` to a host-reachable address such as `localhost:27017`. The Compose hostname `mongodb` only resolves inside the Compose network.
@@ -203,10 +208,8 @@ Run only a single phase and its shared dependency:
 .\mvnw.cmd -pl order-service -am test
 ```
 
-Phase 4 and Phase 5 tests focus on business rules without requiring MongoDB, Eureka, or another running service. Repositories and the synchronous restaurant-service clients are mocked at unit boundaries.
+Phase 4 and Phase 5 tests focus on business rules without requiring MongoDB, Eureka, or another running service. Repositories and the synchronous restaurant-service clients are mocked at unit boundaries. Phase 6 and Phase 7 tests stay at the service boundary too, with RabbitMQ interactions mocked.
 
 ## Next phases
 
-- Billing Service: invoices, simulated payments, and receipts
-- RabbitMQ events connecting reservation, order, kitchen, and billing activity
 - OpenAPI documentation, integration tests, observability, and deployment hardening

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Reservation Service owns table booking: availability checks, requesting a reservation, cancellation, customer history, and the restaurant-side confirm/complete/cancel workflow. It does not own tables — those belong to `restaurant-service` — and it does not yet mutate table status; that side effect is deferred to Phase 7 (see "Known limitations" below).
+Reservation Service owns table booking: availability checks, requesting a reservation, cancellation, customer history, and the restaurant-side confirm/complete/cancel workflow. It does not own tables — those belong to `restaurant-service` — and it mutates table status asynchronously through Phase 7 RabbitMQ events.
 
 ## Service boundary
 
@@ -84,7 +84,7 @@ Restaurant-side authorization cannot use the JWT's `restaurantId` claim the way 
 
 Both response records carry `@JsonIgnoreProperties(ignoreUnknown = true)` so they only declare the fields Reservation Service actually needs, rather than mirroring every field `restaurant-service` returns.
 
-This is a deliberate sync-read choice: cross-service *reads* (does this table exist, who owns this restaurant) are synchronous HTTP calls resolved through Eureka, while cross-service *reactions* (flipping the table to `RESERVED` when a reservation is confirmed) are left for the RabbitMQ event that Phase 7 introduces. Doing the table-status write synchronously now would create a second service with write access to `restaurant-service`'s tables and would need to be re-plumbed once `ReservationCreated`/`ReservationConfirmed` events exist — better to defer it once than build it twice.
+This is still a deliberate sync-read choice: cross-service *reads* (does this table exist, who owns this restaurant) are synchronous HTTP calls resolved through Eureka, while cross-service *reactions* (flipping the table to `RESERVED` or back to `AVAILABLE`) are delivered by RabbitMQ events. Doing the table-status write synchronously would create a second service with write access to `restaurant-service`'s tables and would be harder to keep consistent.
 
 ## Examples
 
@@ -135,14 +135,12 @@ Pure Mockito/AssertJ unit tests, no Testcontainers/MockMvc/`@SpringBootTest`, ma
 
 ## Known limitations
 
-- Table status in `restaurant-service` is not updated when a reservation is created, confirmed, or cancelled. It stays whatever `restaurant-service` already has it as until Phase 7 adds the `ReservationCreated` (and confirm/cancel) events for `restaurant-service` to consume.
 - A reservation's time cannot be rescheduled — only cancelled and rebooked. There is no reschedule endpoint in this phase.
 - The 90-minute slot duration is a fixed constant, not configurable per restaurant or table.
 
 ## Extension points
 
-- Phase 7 producers: `reservation-service` should publish a `ReservationCreated` (and likely `ReservationConfirmed`/`ReservationCancelled`) event after each successful state change, for `restaurant-service` to consume and update `RestaurantTable.status`.
-- Phase 5's `order-service` already notes it can attach a reservation or table reference to an order without changing its item snapshots — Reservation Service's `id` is a natural foreign key for that if dine-in ordering against a reservation is ever added.
+- `order-service` can attach a reservation or table reference to an order without changing item snapshots — Reservation Service's `id` is a natural foreign key for that if dine-in ordering against a reservation is ever added.
 
 ## Design summary
 
