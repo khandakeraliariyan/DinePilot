@@ -16,7 +16,7 @@ Phase 5 adds the path from choosing a menu item to completing it in the kitchen:
 8. The kitchen advances the order through preparation and completion.
 9. The customer can see the order status in history.
 
-Phase 5 does not include payment authorization, table reservations, delivery dispatch, stock decrementing, or RabbitMQ publication. Those boundaries are deliberate: the service has a complete synchronous core without pretending later phases already exist.
+Phase 5 does not include payment authorization, table reservations, delivery dispatch, or stock decrementing. RabbitMQ publication lands in Phase 7, while the synchronous core remains the same.
 
 ## 2. Service boundary
 
@@ -605,7 +605,7 @@ Most Phase 5 business rules are consequences of these boundaries.
 - Order placement has no idempotency key.
 - Cart deletion and order creation are not wrapped in a MongoDB transaction.
 - Kitchen queues do not yet filter or paginate by status.
-- RabbitMQ is provisioned but Phase 5 does not publish order events.
+- RabbitMQ is used in Phase 7 for order, reservation, and billing events.
 
 The first limitation is the most important cross-service follow-up. A robust solution can ask Restaurant Service whether the authenticated admin owns the requested restaurant, or centralize staff membership under a dedicated administrative workflow.
 
@@ -613,9 +613,9 @@ The first limitation is the most important cross-service follow-up. A robust sol
 
 Reservation Service can attach a reservation or table reference to an order without changing item snapshots.
 
-Billing Service can consume the stored total and order ID, then maintain payment status separately. Order status should not be overloaded to represent payment state.
+Billing Service consumes the stored total and order ID, then maintains payment status separately. Order status should not be overloaded to represent payment state.
 
-RabbitMQ events can be emitted after successful state changes:
+RabbitMQ events are emitted after successful state changes:
 
 ```text
 OrderPlaced
@@ -642,4 +642,4 @@ Phase 5 is centered on a small number of durable choices:
 - Customer identity and kitchen scope come from signed tokens.
 - Object-level ownership is checked after loading records.
 
-Those choices keep the current service understandable and give later billing, reservation, and event-driven phases a reliable foundation.
+Those choices keep the current service understandable and support the billing, reservation, and event-driven phases built on top of it.
