@@ -9,6 +9,7 @@ import com.dinepilot.common.exception.ConflictException;
 import com.dinepilot.common.exception.ForbiddenException;
 import com.dinepilot.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -21,7 +22,8 @@ class BillingServiceTest {
     private final OrderClient orderClient = mock(OrderClient.class);
     private final InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
     private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
-    private final BillingService service = new BillingService(orderClient, invoiceRepository, paymentRepository);
+    private final RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+    private final BillingService service = new BillingService(orderClient, invoiceRepository, paymentRepository, rabbitTemplate);
 
     @Test
     void generateInvoiceCopiesTotalFromOrder() {

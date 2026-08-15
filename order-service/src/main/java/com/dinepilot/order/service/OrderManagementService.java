@@ -9,6 +9,10 @@ import com.dinepilot.order.entity.Order;
 import com.dinepilot.order.entity.OrderItem;
 import com.dinepilot.order.enums.OrderStatus;
 import com.dinepilot.order.repository.OrderRepository;
+import com.dinepilot.common.event.EventFactory;
+import com.dinepilot.common.event.OrderCreatedEvent;
+import com.dinepilot.common.event.OrderStatusChangedEvent;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
@@ -17,10 +21,12 @@ import java.util.List;
 public class OrderManagementService {
     private final OrderRepository orders;
     private final CartService cartService;
+    private final RabbitTemplate rabbitTemplate;
 
-    public OrderManagementService(OrderRepository orders, CartService cartService) {
+    public OrderManagementService(OrderRepository orders, CartService cartService, RabbitTemplate rabbitTemplate) {
         this.orders = orders;
         this.cartService = cartService;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public OrderResponse place(String userId) {
@@ -39,6 +45,7 @@ public class OrderManagementService {
         order.setTotal(order.getItems().stream().map(OrderItem::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add));
         Order saved = orders.save(order);
         cartService.clear(cart);
+        publishOrderCreated(saved);
         return toResponse(saved);
     }
 
@@ -56,7 +63,9 @@ public class OrderManagementService {
         Order order = find(orderId);
         if (!order.getUserId().equals(userId)) throw new ForbiddenException("This order belongs to another customer");
         transition(order, OrderStatus.PLACED, OrderStatus.CANCELLED);
-        return toResponse(orders.save(order));
+        Order saved = orders.save(order);
+        publishStatusChanged(saved);
+        return toResponse(saved);
     }
 
     public List<OrderResponse> kitchenOrders(String restaurantId) {
@@ -73,7 +82,15 @@ public class OrderManagementService {
             default -> throw new ConflictException("Unsupported kitchen status transition");
         };
         transition(order, required, target);
-        return toResponse(orders.save(order));
+        Order saved = orders.save(order);
+        publishStatusChanged(saved);
+        return toResponse(saved);
+    }
+
+    public void markPaid(String orderId) {
+        Order order = find(orderId);
+        order.setPaid(true);
+        orders.save(order);
     }
 
     private void transition(Order order, OrderStatus required, OrderStatus target) {
@@ -92,5 +109,17 @@ public class OrderManagementService {
                 i.getUnitPrice(), i.getQuantity(), i.getLineTotal())).toList();
         return new OrderResponse(order.getId(), order.getUserId(), order.getRestaurantId(), order.getStatus(),
                 items, order.getTotal(), order.getCreatedAt(), order.getUpdatedAt());
+    }
+
+    private void publishOrderCreated(Order order) {
+        rabbitTemplate.convertAndSend("dinepilot.events", "order.created",
+                new OrderCreatedEvent(EventFactory.eventId(), EventFactory.now(), order.getId(), order.getUserId(),
+                        order.getRestaurantId(), order.getTotal()));
+    }
+
+    private void publishStatusChanged(Order order) {
+        rabbitTemplate.convertAndSend("dinepilot.events", "order.status.changed",
+                new OrderStatusChangedEvent(EventFactory.eventId(), EventFactory.now(), order.getId(),
+                        order.getUserId(), order.getRestaurantId(), order.getStatus().name()));
     }
 }
