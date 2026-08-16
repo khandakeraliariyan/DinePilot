@@ -1,33 +1,8 @@
 # Full Project Testing and Demo Guide
 
-This guide matches the current DinePilot codebase and shows how to test every exposed API with Postman or any HTTP client.
+This guide is ordered the way you should demo and test DinePilot in Postman.
 
-## 1. Project overview
-
-DinePilot is a Spring Boot microservices backend for restaurant management and online ordering.
-
-Services:
-
-- `user-service` on `8081`
-- `restaurant-service` on `8082`
-- `reservation-service` on `8083`
-- `order-service` on `8084`
-- `billing-service` on `8085`
-- `api-gateway` on `8080`
-- `eureka-server` on `8761`
-
-Supporting infrastructure:
-
-- MongoDB running locally on `localhost:27017`
-- RabbitMQ and Eureka running through Docker Compose
-
-## 2. Local startup
-
-Recommended environment:
-
-- JDK 17+
-- Docker Desktop
-- local MongoDB
+## 1. Local startup
 
 Start the infrastructure first:
 
@@ -35,7 +10,7 @@ Start the infrastructure first:
 docker compose up -d rabbitmq eureka-server
 ```
 
-Then start the services from separate terminals:
+Then start the services:
 
 ```powershell
 .\mvnw.cmd -f api-gateway/pom.xml spring-boot:run
@@ -49,17 +24,17 @@ Then start the services from separate terminals:
 Useful URLs:
 
 - Gateway: `http://localhost:8080`
-- Eureka dashboard: `http://localhost:8761`
-- RabbitMQ management: `http://localhost:15672`
+- Eureka: `http://localhost:8761`
+- RabbitMQ UI: `http://localhost:15672`
 - User Service: `http://localhost:8081`
 - Restaurant Service: `http://localhost:8082`
 - Reservation Service: `http://localhost:8083`
 - Order Service: `http://localhost:8084`
 - Billing Service: `http://localhost:8085`
 
-## 3. Postman environment
+## 2. Postman environment
 
-Create one Postman environment with these variables:
+Create these variables:
 
 - `base_url` = `http://localhost:8080`
 - `customer_token`
@@ -73,19 +48,19 @@ Create one Postman environment with these variables:
 - `invoice_id`
 - `reservation_id`
 - `user_id`
+- `address_id`
 
-Use these headers on protected requests:
+Use this header for protected requests:
 
 - `Authorization: Bearer {{token}}`
 - `Content-Type: application/json`
 
-## 4. Auth APIs
+## 3. Create the users first
 
-### 4.1 Register user
+### 3.1 Register customer
 
 - Method: `POST`
 - URL: `{{base_url}}/api/auth/register`
-- Auth: none
 - Body:
 
 ```json
@@ -97,22 +72,98 @@ Use these headers on protected requests:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Registration successful`
-- Response `data` contains access token, refresh token, and user profile fields
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token",
+    "user": {
+      "id": "user-id",
+      "email": "customer@example.com",
+      "role": "CUSTOMER"
+    }
+  }
+}
+```
 
-Important:
+### 3.2 Register restaurant admin
 
-- The field name is `fullName`, not `name`
-- `password` must be at least 8 characters
+- Method: `POST`
+- URL: `{{base_url}}/api/auth/register`
+- Body:
 
-### 4.2 Login
+```json
+{
+  "email": "admin@example.com",
+  "password": "Pass1234!",
+  "fullName": "Restaurant Admin",
+  "phone": "+8801711111111"
+}
+```
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token"
+  }
+}
+```
+
+### 3.3 Register kitchen user
+
+- Method: `POST`
+- URL: `{{base_url}}/api/auth/register`
+- Body:
+
+```json
+{
+  "email": "kitchen@example.com",
+  "password": "Pass1234!",
+  "fullName": "Kitchen User",
+  "phone": "+8801722222222"
+}
+```
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token"
+  }
+}
+```
+
+## 4. Promote roles in MongoDB
+
+After registration, update the user documents in MongoDB:
+
+- customer stays `CUSTOMER`
+- admin becomes `RESTAURANT_ADMIN`
+- kitchen user becomes `KITCHEN`
+
+If the kitchen user is going to process one restaurant, also assign that restaurant later with:
+
+- `PATCH /api/users/{userId}/kitchen-restaurant`
+
+## 5. Log in and save tokens
+
+### 5.1 Customer login
 
 - Method: `POST`
 - URL: `{{base_url}}/api/auth/login`
-- Auth: none
 - Body:
 
 ```json
@@ -122,165 +173,86 @@ Important:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Login successful`
-- Response `data` contains access token, refresh token, and profile information
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "accessToken": "customer-jwt",
+    "refreshToken": "customer-refresh-token"
+  }
+}
+```
 
-### 4.3 Refresh token
+Save `accessToken` to `customer_token`.
+
+### 5.2 Admin login
 
 - Method: `POST`
-- URL: `{{base_url}}/api/auth/refresh`
-- Auth: none
+- URL: `{{base_url}}/api/auth/login`
 - Body:
 
 ```json
 {
-  "refreshToken": "{{refresh_token}}"
+  "email": "admin@example.com",
+  "password": "Pass1234!"
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Token refreshed`
-- New access token in `data`
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "accessToken": "admin-jwt",
+    "refreshToken": "admin-refresh-token"
+  }
+}
+```
 
-### 4.4 Logout
+Save `accessToken` to `admin_token`.
+
+### 5.3 Kitchen login
 
 - Method: `POST`
-- URL: `{{base_url}}/api/auth/logout`
-- Auth: none
+- URL: `{{base_url}}/api/auth/login`
 - Body:
 
 ```json
 {
-  "refreshToken": "{{refresh_token}}"
+  "email": "kitchen@example.com",
+  "password": "Pass1234!"
 }
 ```
 
-Expected:
-
-- `200 OK`
-- Response message: `Logged out`
-
-## 5. User APIs
-
-### 5.1 Get my profile
-
-- Method: `GET`
-- URL: `{{base_url}}/api/users/me`
-- Auth: customer/admin/kitchen token
-
-Expected:
-
-- `200 OK`
-- `data` contains the current user's profile
-
-### 5.2 Update my profile
-
-- Method: `PUT`
-- URL: `{{base_url}}/api/users/me`
-- Auth: current user token
-- Body:
+Expected response:
 
 ```json
 {
-  "fullName": "Customer One Updated",
-  "phone": "+8801711111111"
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "accessToken": "kitchen-jwt",
+    "refreshToken": "kitchen-refresh-token"
+  }
 }
 ```
 
-Expected:
+Save `accessToken` to `kitchen_token`.
 
-- `200 OK`
-- Response message: `Profile updated`
+## 6. Create restaurant data
 
-### 5.3 Assign kitchen restaurant
-
-- Method: `PATCH`
-- URL: `{{base_url}}/api/users/{{user_id}}/kitchen-restaurant`
-- Auth: `RESTAURANT_ADMIN` or `SUPER_ADMIN`
-- Body:
-
-```json
-{
-  "restaurantId": "{{restaurant_id}}"
-}
-```
-
-Expected:
-
-- `200 OK`
-- Response message: `Kitchen restaurant assigned`
-
-### 5.4 Address list
-
-- Method: `GET`
-- URL: `{{base_url}}/api/users/me/addresses`
-- Auth: current user token
-
-Expected:
-
-- `200 OK`
-- `data` is a list of addresses
-
-### 5.5 Create address
-
-- Method: `POST`
-- URL: `{{base_url}}/api/users/me/addresses`
-- Auth: current user token
-- Body:
-
-```json
-{
-  "label": "Home",
-  "line1": "123 Main Street",
-  "line2": "Apt 4B",
-  "city": "Dhaka",
-  "state": "Dhaka",
-  "postalCode": "1205",
-  "country": "Bangladesh",
-  "defaultAddress": true
-}
-```
-
-Expected:
-
-- `200 OK`
-- Response message: `Address created`
-
-### 5.6 Update address
-
-- Method: `PUT`
-- URL: `{{base_url}}/api/users/me/addresses/{{address_id}}`
-- Auth: current user token
-- Body: same shape as create address
-
-Expected:
-
-- `200 OK`
-- Response message: `Address updated`
-
-### 5.7 Delete address
-
-- Method: `DELETE`
-- URL: `{{base_url}}/api/users/me/addresses/{{address_id}}`
-- Auth: current user token
-
-Expected:
-
-- `200 OK`
-- Response message: `Address deleted`
-
-## 6. Restaurant APIs
+Do this with the restaurant admin token.
 
 ### 6.1 Create restaurant
 
 - Method: `POST`
 - URL: `{{base_url}}/api/restaurants`
-- Auth: `RESTAURANT_ADMIN`
+- Header: `Authorization: Bearer {{admin_token}}`
 - Body:
 
 ```json
@@ -300,62 +272,26 @@ Expected:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Restaurant created`
-- Save returned restaurant id to `restaurant_id`
+```json
+{
+  "success": true,
+  "message": "Restaurant created",
+  "data": {
+    "id": "restaurant-id",
+    "name": "DinePilot Bistro"
+  }
+}
+```
 
-### 6.2 List restaurants
+Save the restaurant id to `restaurant_id`.
 
-- Method: `GET`
-- URL: `{{base_url}}/api/restaurants`
-- Auth: none
-
-Expected:
-
-- `200 OK`
-- `data` contains all restaurants
-
-### 6.3 Get restaurant by id
-
-- Method: `GET`
-- URL: `{{base_url}}/api/restaurants/{{restaurant_id}}`
-- Auth: none
-
-Expected:
-
-- `200 OK`
-- `data` contains the restaurant
-
-### 6.4 Update restaurant
-
-- Method: `PUT`
-- URL: `{{base_url}}/api/restaurants/{{restaurant_id}}`
-- Auth: `RESTAURANT_ADMIN`
-- Body: same shape as create restaurant
-
-Expected:
-
-- `200 OK`
-- Response message: `Restaurant updated`
-
-### 6.5 Delete restaurant
-
-- Method: `DELETE`
-- URL: `{{base_url}}/api/restaurants/{{restaurant_id}}`
-- Auth: `RESTAURANT_ADMIN`
-
-Expected:
-
-- `200 OK`
-- Response message: `Restaurant deleted`
-
-### 6.6 Create category
+### 6.2 Create category
 
 - Method: `POST`
 - URL: `{{base_url}}/api/categories`
-- Auth: restaurant admin
+- Header: `Authorization: Bearer {{admin_token}}`
 - Body:
 
 ```json
@@ -367,51 +303,27 @@ Expected:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Category created`
-- Save id to `category_id`
+```json
+{
+  "success": true,
+  "message": "Category created",
+  "data": {
+    "id": "category-id",
+    "restaurantId": "{{restaurant_id}}",
+    "name": "Main Course"
+  }
+}
+```
 
-### 6.7 List categories
+Save the id to `category_id`.
 
-- Method: `GET`
-- URL: `{{base_url}}/api/categories?restaurantId={{restaurant_id}}`
-- Auth: none
-
-Expected:
-
-- `200 OK`
-- `data` contains category list
-
-### 6.8 Update category
-
-- Method: `PUT`
-- URL: `{{base_url}}/api/categories/{{category_id}}`
-- Auth: restaurant admin
-- Body: same shape as create category
-
-Expected:
-
-- `200 OK`
-- Response message: `Category updated`
-
-### 6.9 Delete category
-
-- Method: `DELETE`
-- URL: `{{base_url}}/api/categories/{{category_id}}`
-- Auth: restaurant admin
-
-Expected:
-
-- `200 OK`
-- Response message: `Category deleted`
-
-### 6.10 Create menu item
+### 6.3 Create menu item
 
 - Method: `POST`
 - URL: `{{base_url}}/api/menu`
-- Auth: restaurant admin
+- Header: `Authorization: Bearer {{admin_token}}`
 - Body:
 
 ```json
@@ -420,85 +332,32 @@ Expected:
   "categoryId": "{{category_id}}",
   "name": "Grilled Chicken Steak",
   "description": "Served with veggies",
-  "price": 850.00,
+  "price": 850,
   "available": true
 }
 ```
 
-Expected:
-
-- `200 OK`
-- Response message: `Food created`
-- Save id to `menu_id`
-
-### 6.11 Search menu
-
-- Method: `GET`
-- URL: `{{base_url}}/api/menu?restaurantId={{restaurant_id}}&categoryId={{category_id}}&available=true&q=steak`
-- Auth: none
-
-Expected:
-
-- `200 OK`
-- `data` contains matching menu items
-
-### 6.12 Get menu item by id
-
-- Method: `GET`
-- URL: `{{base_url}}/api/menu/{{menu_id}}`
-- Auth: none
-
-Expected:
-
-- `200 OK`
-- `data` contains the menu item
-
-### 6.13 Update menu item
-
-- Method: `PUT`
-- URL: `{{base_url}}/api/menu/{{menu_id}}`
-- Auth: restaurant admin
-- Body: same shape as create menu item
-
-Expected:
-
-- `200 OK`
-- Response message: `Food updated`
-
-### 6.14 Update availability
-
-- Method: `PATCH`
-- URL: `{{base_url}}/api/menu/{{menu_id}}/availability`
-- Auth: restaurant admin
-- Body:
+Expected response:
 
 ```json
 {
-  "available": false
+  "success": true,
+  "message": "Food created",
+  "data": {
+    "id": "menu-id",
+    "name": "Grilled Chicken Steak",
+    "available": true
+  }
 }
 ```
 
-Expected:
+Save the id to `menu_id`.
 
-- `200 OK`
-- Response message: `Availability updated`
-
-### 6.15 Delete menu item
-
-- Method: `DELETE`
-- URL: `{{base_url}}/api/menu/{{menu_id}}`
-- Auth: restaurant admin
-
-Expected:
-
-- `200 OK`
-- Response message: `Food deleted`
-
-### 6.16 Create table
+### 6.4 Create table
 
 - Method: `POST`
 - URL: `{{base_url}}/api/tables`
-- Auth: restaurant admin
+- Header: `Authorization: Bearer {{admin_token}}`
 - Body:
 
 ```json
@@ -509,93 +368,207 @@ Expected:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Table created`
-- Save id to `table_id`
+```json
+{
+  "success": true,
+  "message": "Table created",
+  "data": {
+    "id": "table-id",
+    "tableNumber": "T1",
+    "capacity": 4
+  }
+}
+```
 
-### 6.17 List tables
+Save the id to `table_id`.
+
+## 7. Run customer CRUD flow
+
+Do this with the customer token.
+
+### 7.1 Get my profile
 
 - Method: `GET`
-- URL: `{{base_url}}/api/tables?restaurantId={{restaurant_id}}`
-- Auth: none
+- URL: `{{base_url}}/api/users/me`
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains tables
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "id": "user-id",
+    "email": "customer@example.com",
+    "fullName": "Customer One"
+  }
+}
+```
 
-### 6.18 Get table by id
-
-- Method: `GET`
-- URL: `{{base_url}}/api/tables/{{table_id}}`
-- Auth: none
-
-Expected:
-
-- `200 OK`
-- `data` contains the table
-
-### 6.19 Update table
+### 7.2 Update my profile
 
 - Method: `PUT`
-- URL: `{{base_url}}/api/tables/{{table_id}}`
-- Auth: restaurant admin
-- Body: same shape as create table
-
-Expected:
-
-- `200 OK`
-- Response message: `Table updated`
-
-### 6.20 Update table status
-
-- Method: `PATCH`
-- URL: `{{base_url}}/api/tables/{{table_id}}/status`
-- Auth: restaurant admin
+- URL: `{{base_url}}/api/users/me`
+- Header: `Authorization: Bearer {{customer_token}}`
 - Body:
 
 ```json
 {
-  "status": "AVAILABLE"
+  "fullName": "Customer One Updated",
+  "phone": "+8801711111111"
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Status updated`
+```json
+{
+  "success": true,
+  "message": "Profile updated",
+  "data": {
+    "fullName": "Customer One Updated",
+    "phone": "+8801711111111"
+  }
+}
+```
 
-### 6.21 Delete table
+### 7.3 Create address
+
+- Method: `POST`
+- URL: `{{base_url}}/api/users/me/addresses`
+- Header: `Authorization: Bearer {{customer_token}}`
+- Body:
+
+```json
+{
+  "label": "Home",
+  "line1": "123 Main Street",
+  "line2": "Apt 4B",
+  "city": "Dhaka",
+  "state": "Dhaka",
+  "postalCode": "1205",
+  "country": "Bangladesh",
+  "defaultAddress": true
+}
+```
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Address created",
+  "data": {
+    "id": "address-id",
+    "label": "Home",
+    "city": "Dhaka"
+  }
+}
+```
+
+Save the id to `address_id`.
+
+### 7.4 List addresses
+
+- Method: `GET`
+- URL: `{{base_url}}/api/users/me/addresses`
+- Header: `Authorization: Bearer {{customer_token}}`
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": [
+    {
+      "id": "address-id",
+      "label": "Home"
+    }
+  ]
+}
+```
+
+### 7.5 Update address
+
+- Method: `PUT`
+- URL: `{{base_url}}/api/users/me/addresses/{{address_id}}`
+- Header: `Authorization: Bearer {{customer_token}}`
+- Body:
+
+```json
+{
+  "label": "Home Updated",
+  "line1": "123 Main Street",
+  "line2": "Apt 4B",
+  "city": "Dhaka",
+  "state": "Dhaka",
+  "postalCode": "1205",
+  "country": "Bangladesh",
+  "defaultAddress": true
+}
+```
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Address updated",
+  "data": {
+    "id": "address-id",
+    "label": "Home Updated"
+  }
+}
+```
+
+### 7.6 Delete address
 
 - Method: `DELETE`
-- URL: `{{base_url}}/api/tables/{{table_id}}`
-- Auth: restaurant admin
+- URL: `{{base_url}}/api/users/me/addresses/{{address_id}}`
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Table deleted`
+```json
+{
+  "success": true,
+  "message": "Address deleted",
+  "data": null
+}
+```
 
-## 7. Cart APIs
+## 8. Cart and order flow
 
-### 7.1 View cart
+### 8.1 View cart
 
 - Method: `GET`
 - URL: `{{base_url}}/api/cart`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains current cart or an empty cart response
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "id": "cart-id",
+    "restaurantId": "{{restaurant_id}}",
+    "items": [],
+    "total": 0
+  }
+}
+```
 
-### 7.2 Add item to cart
+### 8.2 Add item to cart
 
 - Method: `POST`
 - URL: `{{base_url}}/api/cart/items`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 - Body:
 
 ```json
@@ -605,17 +578,30 @@ Expected:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Item added`
-- Cart total updates using live menu data
+```json
+{
+  "success": true,
+  "message": "Item added",
+  "data": {
+    "restaurantId": "{{restaurant_id}}",
+    "items": [
+      {
+        "foodId": "{{menu_id}}",
+        "quantity": 2
+      }
+    ],
+    "total": 1700
+  }
+}
+```
 
-### 7.3 Update cart item quantity
+### 8.3 Update cart item quantity
 
 - Method: `PUT`
 - URL: `{{base_url}}/api/cart/items/{{menu_id}}`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 - Body:
 
 ```json
@@ -624,139 +610,341 @@ Expected:
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Item updated`
+```json
+{
+  "success": true,
+  "message": "Item updated",
+  "data": {
+    "items": [
+      {
+        "foodId": "{{menu_id}}",
+        "quantity": 3
+      }
+    ],
+    "total": 2550
+  }
+}
+```
 
-### 7.4 Remove cart item
+### 8.4 Remove cart item
 
 - Method: `DELETE`
 - URL: `{{base_url}}/api/cart/items/{{menu_id}}`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Item removed`
+```json
+{
+  "success": true,
+  "message": "Item removed",
+  "data": {
+    "items": [],
+    "total": 0
+  }
+}
+```
 
-## 8. Order APIs
-
-### 8.1 Place order
+### 8.5 Place order
 
 - Method: `POST`
 - URL: `{{base_url}}/api/orders`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Order placed`
-- Save id to `order_id`
-- Cart is cleared after order creation
+```json
+{
+  "success": true,
+  "message": "Order placed",
+  "data": {
+    "id": "order-id",
+    "status": "PLACED",
+    "restaurantId": "{{restaurant_id}}"
+  }
+}
+```
 
-### 8.2 Order history
+Save the id to `order_id`.
+
+### 8.6 Order history
 
 - Method: `GET`
 - URL: `{{base_url}}/api/orders`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains customer orders
+```json
+{
+  "success": true,
+  "message": null,
+  "data": [
+    {
+      "id": "order-id",
+      "status": "PLACED"
+    }
+  ]
+}
+```
 
-### 8.3 Get order by id
+### 8.7 Get order by id
 
 - Method: `GET`
 - URL: `{{base_url}}/api/orders/{{order_id}}`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains order details and snapshots
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "id": "order-id",
+    "status": "PLACED"
+  }
+}
+```
 
-### 8.4 Cancel order
+### 8.8 Cancel order
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/orders/{{order_id}}/cancel`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Order cancelled`
-- Only allowed when the order status rules permit cancellation
+```json
+{
+  "success": true,
+  "message": "Order cancelled",
+  "data": {
+    "id": "order-id",
+    "status": "CANCELLED"
+  }
+}
+```
 
-## 9. Kitchen order APIs
+## 9. Kitchen workflow
 
-Kitchen requests require a user with `KITCHEN` role and a restaurant assignment in the JWT claims.
+Before this step, make sure the kitchen user has a restaurant assignment.
 
-### 9.1 List kitchen orders
+### 9.1 Assign kitchen restaurant
+
+- Method: `PATCH`
+- URL: `{{base_url}}/api/users/{{user_id}}/kitchen-restaurant`
+- Header: `Authorization: Bearer {{admin_token}}`
+- Body:
+
+```json
+{
+  "restaurantId": "{{restaurant_id}}"
+}
+```
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Kitchen restaurant assigned",
+  "data": {
+    "id": "kitchen-user-id",
+    "restaurantId": "{{restaurant_id}}"
+  }
+}
+```
+
+### 9.2 List kitchen orders
 
 - Method: `GET`
 - URL: `{{base_url}}/api/kitchen/orders`
-- Auth: kitchen token
+- Header: `Authorization: Bearer {{kitchen_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains orders for the assigned restaurant only
+```json
+{
+  "success": true,
+  "message": null,
+  "data": [
+    {
+      "id": "order-id",
+      "status": "PLACED"
+    }
+  ]
+}
+```
 
-### 9.2 Accept order
+### 9.3 Accept order
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/kitchen/orders/{{order_id}}/accept`
-- Auth: kitchen token
+- Header: `Authorization: Bearer {{kitchen_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Order accepted`
+```json
+{
+  "success": true,
+  "message": "Order accepted",
+  "data": {
+    "id": "order-id",
+    "status": "PREPARING"
+  }
+}
+```
 
-### 9.3 Mark preparing
+### 9.4 Mark preparing
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/kitchen/orders/{{order_id}}/preparing`
-- Auth: kitchen token
+- Header: `Authorization: Bearer {{kitchen_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Order preparing`
+```json
+{
+  "success": true,
+  "message": "Order preparing",
+  "data": {
+    "id": "order-id",
+    "status": "PREPARING"
+  }
+}
+```
 
-### 9.4 Mark ready
+### 9.5 Mark ready
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/kitchen/orders/{{order_id}}/ready`
-- Auth: kitchen token
+- Header: `Authorization: Bearer {{kitchen_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Order ready`
+```json
+{
+  "success": true,
+  "message": "Order ready",
+  "data": {
+    "id": "order-id",
+    "status": "READY"
+  }
+}
+```
 
-### 9.5 Mark completed
+### 9.6 Mark completed
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/kitchen/orders/{{order_id}}/completed`
-- Auth: kitchen token
+- Header: `Authorization: Bearer {{kitchen_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Order completed`
+```json
+{
+  "success": true,
+  "message": "Order completed",
+  "data": {
+    "id": "order-id",
+    "status": "COMPLETED"
+  }
+}
+```
 
-This completion step is important because Billing Service expects completed orders before it generates invoices.
+## 10. Billing flow
 
-## 10. Reservation APIs
+### 10.1 Generate invoice
 
-### 10.1 Book reservation
+- Method: `POST`
+- URL: `{{base_url}}/api/invoices/orders/{{order_id}}`
+- Header: `Authorization: Bearer {{customer_token}}`
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Invoice generated",
+  "data": {
+    "id": "invoice-id",
+    "orderId": "{{order_id}}",
+    "status": "PENDING"
+  }
+}
+```
+
+Save the id to `invoice_id`.
+
+### 10.2 List my invoices
+
+- Method: `GET`
+- URL: `{{base_url}}/api/invoices/me`
+- Header: `Authorization: Bearer {{customer_token}}`
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": [
+    {
+      "id": "invoice-id",
+      "status": "PENDING"
+    }
+  ]
+}
+```
+
+### 10.3 Get invoice by id
+
+- Method: `GET`
+- URL: `{{base_url}}/api/invoices/{{invoice_id}}`
+- Header: `Authorization: Bearer {{customer_token}}`
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "id": "invoice-id",
+    "status": "PENDING"
+  }
+}
+```
+
+### 10.4 Pay invoice
+
+- Method: `POST`
+- URL: `{{base_url}}/api/invoices/{{invoice_id}}/pay`
+- Header: `Authorization: Bearer {{customer_token}}`
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Payment completed",
+  "data": {
+    "id": "payment-id",
+    "status": "COMPLETED"
+  }
+}
+```
+
+## 11. Reservation flow
+
+### 11.1 Book reservation
 
 - Method: `POST`
 - URL: `{{base_url}}/api/reservations`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 - Body:
 
 ```json
@@ -768,211 +956,202 @@ This completion step is important because Billing Service expects completed orde
 }
 ```
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Reservation requested`
-- Save id to `reservation_id`
+```json
+{
+  "success": true,
+  "message": "Reservation requested",
+  "data": {
+    "id": "reservation-id",
+    "status": "PENDING",
+    "tableId": "{{table_id}}"
+  }
+}
+```
 
-Validation expectations:
+Save the id to `reservation_id`.
 
-- `tableId` must not be blank
-- `partySize` must be positive
-- `reservedFor` must be a future `Instant`
-- `notes` must be 500 characters or fewer
-
-### 10.2 Reservation history
+### 11.2 Reservation history
 
 - Method: `GET`
 - URL: `{{base_url}}/api/reservations`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains customer reservations
+```json
+{
+  "success": true,
+  "message": null,
+  "data": [
+    {
+      "id": "reservation-id",
+      "status": "PENDING"
+    }
+  ]
+}
+```
 
-### 10.3 Get reservation by id
+### 11.3 Get reservation by id
 
 - Method: `GET`
 - URL: `{{base_url}}/api/reservations/{{reservation_id}}`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains the reservation
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "id": "reservation-id",
+    "status": "PENDING"
+  }
+}
+```
 
-### 10.4 Cancel reservation
+### 11.4 Cancel reservation
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/reservations/{{reservation_id}}/cancel`
-- Auth: customer token
+- Header: `Authorization: Bearer {{customer_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Reservation cancelled`
+```json
+{
+  "success": true,
+  "message": "Reservation cancelled",
+  "data": {
+    "id": "reservation-id",
+    "status": "CANCELLED"
+  }
+}
+```
 
-### 10.5 List restaurant reservations
+### 11.5 List restaurant reservations
 
 - Method: `GET`
 - URL: `{{base_url}}/api/reservations/restaurant/{{restaurant_id}}`
-- Auth: restaurant admin token
+- Header: `Authorization: Bearer {{admin_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- `data` contains reservations for that restaurant
+```json
+{
+  "success": true,
+  "message": null,
+  "data": [
+    {
+      "id": "reservation-id",
+      "status": "PENDING"
+    }
+  ]
+}
+```
 
-### 10.6 Confirm reservation
+### 11.6 Confirm reservation
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/reservations/restaurant/{{reservation_id}}/confirm`
-- Auth: restaurant admin token
+- Header: `Authorization: Bearer {{admin_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Reservation confirmed`
+```json
+{
+  "success": true,
+  "message": "Reservation confirmed",
+  "data": {
+    "id": "reservation-id",
+    "status": "CONFIRMED"
+  }
+}
+```
 
-### 10.7 Complete reservation
+### 11.7 Complete reservation
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/reservations/restaurant/{{reservation_id}}/complete`
-- Auth: restaurant admin token
+- Header: `Authorization: Bearer {{admin_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Reservation completed`
+```json
+{
+  "success": true,
+  "message": "Reservation completed",
+  "data": {
+    "id": "reservation-id",
+    "status": "COMPLETED"
+  }
+}
+```
 
-### 10.8 Cancel reservation from restaurant side
+### 11.8 Cancel reservation from restaurant side
 
 - Method: `PATCH`
 - URL: `{{base_url}}/api/reservations/restaurant/{{reservation_id}}/cancel`
-- Auth: restaurant admin token
+- Header: `Authorization: Bearer {{admin_token}}`
 
-Expected:
+Expected response:
 
-- `200 OK`
-- Response message: `Reservation cancelled`
+```json
+{
+  "success": true,
+  "message": "Reservation cancelled",
+  "data": {
+    "id": "reservation-id",
+    "status": "CANCELLED"
+  }
+}
+```
 
-## 11. Billing APIs
+## 12. Suggested demo order
 
-### 11.1 Generate invoice from order
+Use this exact order during testing:
 
-- Method: `POST`
-- URL: `{{base_url}}/api/invoices/orders/{{order_id}}`
-- Auth: customer token or restaurant admin token
+1. Register customer, restaurant admin, and kitchen user
+2. Promote the roles in MongoDB
+3. Log in all three users and save the tokens
+4. Create restaurant, category, menu item, and table
+5. Update customer profile and address
+6. Add item to cart, update it, remove it, then add it again
+7. Place the order
+8. Assign the kitchen restaurant
+9. Accept, prepare, ready, and complete the order
+10. Generate the invoice and pay it
+11. Book the reservation
+12. Confirm and complete it from the restaurant admin account
 
-Expected:
+## 13. Common validation failures
 
-- `200 OK`
-- Response message: `Invoice generated`
-- Save id to `invoice_id`
+If you get `400 Bad Request`, check:
 
-Rules:
-
-- the order must already be `COMPLETED`
-- the caller must own the order unless the caller is restaurant admin or super admin
-
-### 11.2 List my invoices
-
-- Method: `GET`
-- URL: `{{base_url}}/api/invoices/me`
-- Auth: customer token
-
-Expected:
-
-- `200 OK`
-- `data` contains invoices for the current customer
-
-### 11.3 Get invoice by id
-
-- Method: `GET`
-- URL: `{{base_url}}/api/invoices/{{invoice_id}}`
-- Auth: customer token or restaurant admin token
-
-Expected:
-
-- `200 OK`
-- `data` contains invoice details
-
-### 11.4 Pay invoice
-
-- Method: `POST`
-- URL: `{{base_url}}/api/invoices/{{invoice_id}}/pay`
-- Auth: customer token or restaurant admin token
-
-Expected:
-
-- `200 OK`
-- Response message: `Payment completed`
-- Payment record is created
-- Invoice status becomes `PAID`
-
-## 12. Expected happy-path demo flow
-
-Use this order for a live demo:
-
-1. Register customer, restaurant admin, and kitchen user.
-2. Log in all three users and store tokens.
-3. Promote users in MongoDB to the correct roles.
-4. Create restaurant, category, menu item, and table as the restaurant admin.
-5. Add menu item to cart as the customer.
-6. Place the order as the customer.
-7. Complete the order from the kitchen account.
-8. Generate and pay the invoice.
-9. Book a reservation as the customer.
-10. Confirm and complete it as the restaurant admin.
-
-## 13. What to verify
-
-- Public endpoints work without tokens
-- Protected endpoints reject missing or wrong-role tokens
-- Request validation returns `400` with clear messages
-- Cart rejects invalid food ids and invalid quantities
-- Order snapshot values do not change after menu edits
-- Kitchen actions only work for the assigned restaurant
-- Reservation overlap rules are enforced
-- Billing only generates invoices from completed orders
-- Payment changes invoice state to `PAID`
-
-## 14. Common validation errors
-
-If you see `400 Bad Request`, check these first:
-
-- `fullName` is missing on register or profile update
-- `email` is missing or invalid
+- `fullName` is missing
+- `email` is invalid
 - `password` is too short
 - `restaurantId`, `categoryId`, `foodId`, or `tableId` is blank
 - `quantity` is less than 1
 - `capacity` is not positive
 - `reservedFor` is not in the future
 
-## 15. Verification commands
+If you get `403 Forbidden`, check:
 
-Run backend tests:
+- the token belongs to the wrong role
+- the kitchen user is not assigned to the restaurant
+- the token is expired or stale
 
-```powershell
-.\mvnw.cmd clean test
-```
+## 14. Final check
 
-Run a specific module:
+Before presenting, verify:
 
-```powershell
-.\mvnw.cmd -f user-service/pom.xml test
-.\mvnw.cmd -f restaurant-service/pom.xml test
-.\mvnw.cmd -f reservation-service/pom.xml test
-.\mvnw.cmd -f order-service/pom.xml test
-.\mvnw.cmd -f billing-service/pom.xml test
-```
-
-## 16. Notes
-
-- MongoDB runs locally on `localhost:27017`
-- RabbitMQ and Eureka are started with Docker Compose
-- The services use Eureka automatically after startup
-- If you change secrets or ports, update `.env` and the service YAML files together
+- `GET /api/users/me` works with a fresh token
+- restaurant admin can create resources
+- customer can add items to cart
+- order can be placed and completed
+- invoice can be generated from a completed order
+- reservation can be booked and confirmed
 
