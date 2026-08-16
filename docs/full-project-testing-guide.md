@@ -29,13 +29,13 @@ You only need:
 - JDK 17
 - the repo
 
-The repo already includes Docker Compose for MongoDB, RabbitMQ, and the app services.
+The repo already includes Docker Compose for RabbitMQ and Eureka. MongoDB runs locally on your PC.
 
 ### Start the stack
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up -d --build
+docker compose up -d rabbitmq eureka-server
 docker compose ps
 ```
 
@@ -144,6 +144,180 @@ Then show:
 - `GET /api/orders/{id}`
 
 You can explain that the order stores a snapshot of price, name, and totals so later menu edits do not change existing orders.
+
+## 4A. Postman request checklist
+
+Use one Postman environment with variables like:
+
+- `base_url` = `http://localhost:8080`
+- `customer_token`
+- `admin_token`
+- `kitchen_token`
+- `restaurant_id`
+- `category_id`
+- `menu_id`
+- `table_id`
+- `order_id`
+- `invoice_id`
+- `reservation_id`
+
+### Auth
+
+1. `Register Customer`
+   - `POST {{base_url}}/api/auth/register`
+   - Body:
+   ```json
+   {
+     "name": "Customer One",
+     "email": "customer@example.com",
+     "password": "Pass1234!"
+   }
+   ```
+   - Expected: `200 OK`
+
+2. `Register Admin`
+   - `POST {{base_url}}/api/auth/register`
+   - Same shape as above
+   - Then promote the user in MongoDB to `RESTAURANT_ADMIN`
+
+3. `Register Kitchen`
+   - `POST {{base_url}}/api/auth/register`
+   - Same shape as above
+   - Then promote the user in MongoDB to `KITCHEN`
+
+4. `Login Customer`
+   - `POST {{base_url}}/api/auth/login`
+   - Body:
+   ```json
+   {
+     "email": "customer@example.com",
+     "password": "Pass1234!"
+   }
+   ```
+   - Save token to `customer_token`
+
+5. `Login Admin`
+   - Save token to `admin_token`
+
+6. `Login Kitchen`
+   - Save token to `kitchen_token`
+
+### Restaurant setup
+
+7. `Create Restaurant`
+   - `POST {{base_url}}/api/restaurants`
+   - Header: `Authorization: Bearer {{admin_token}}`
+   - Expected: restaurant id in response
+
+8. `Create Category`
+   - `POST {{base_url}}/api/categories`
+   - Header: `Authorization: Bearer {{admin_token}}`
+
+9. `Create Menu Item`
+   - `POST {{base_url}}/api/menu`
+   - Header: `Authorization: Bearer {{admin_token}}`
+
+10. `Create Table`
+    - `POST {{base_url}}/api/tables`
+    - Header: `Authorization: Bearer {{admin_token}}`
+
+### Cart and order
+
+11. `Add Cart Item`
+    - `POST {{base_url}}/api/cart/items`
+    - Header: `Authorization: Bearer {{customer_token}}`
+    - Body:
+    ```json
+    {
+      "foodId": "{{menu_id}}",
+      "quantity": 2
+    }
+    ```
+    - Expected: cart response with calculated total
+
+12. `View Cart`
+    - `GET {{base_url}}/api/cart`
+
+13. `Place Order`
+    - `POST {{base_url}}/api/orders`
+    - Expected: store `order_id`
+
+14. `Order History`
+    - `GET {{base_url}}/api/orders`
+
+15. `Order Details`
+    - `GET {{base_url}}/api/orders/{{order_id}}`
+
+### Kitchen workflow
+
+16. `Kitchen List`
+    - `GET {{base_url}}/api/kitchen/orders`
+    - Header: `Authorization: Bearer {{kitchen_token}}`
+
+17. `Accept Order`
+    - `PATCH {{base_url}}/api/kitchen/orders/{{order_id}}/accept`
+
+18. `Mark Ready`
+    - `PATCH {{base_url}}/api/kitchen/orders/{{order_id}}/ready`
+
+19. `Complete Order`
+    - `PATCH {{base_url}}/api/kitchen/orders/{{order_id}}/completed`
+
+### Billing
+
+20. `Create Invoice`
+    - `POST {{base_url}}/api/invoices/orders/{{order_id}}`
+    - Header: `Authorization: Bearer {{customer_token}}`
+    - Expected: store `invoice_id`
+
+21. `My Invoices`
+    - `GET {{base_url}}/api/invoices/me`
+
+22. `Pay Invoice`
+    - `POST {{base_url}}/api/invoices/{{invoice_id}}/pay`
+
+### Reservation
+
+23. `Book Reservation`
+    - `POST {{base_url}}/api/reservations`
+    - Header: `Authorization: Bearer {{customer_token}}`
+    - Body:
+    ```json
+    {
+      "tableId": "{{table_id}}",
+      "partySize": 4,
+      "reservedFor": "2026-09-01T19:00:00Z",
+      "notes": "Anniversary dinner"
+    }
+    ```
+    - Expected: store `reservation_id`
+
+24. `Reservation History`
+    - `GET {{base_url}}/api/reservations`
+
+25. `Confirm Reservation`
+    - `PATCH {{base_url}}/api/reservations/restaurant/{{reservation_id}}/confirm`
+    - Header: `Authorization: Bearer {{admin_token}}`
+
+26. `Complete Reservation`
+    - `PATCH {{base_url}}/api/reservations/restaurant/{{reservation_id}}/complete`
+
+### Extra headers
+
+For all protected requests:
+
+- `Authorization: Bearer <token>`
+- `Content-Type: application/json`
+
+### What to verify
+
+- menu item adds only if it exists and is available
+- order total matches cart total
+- kitchen order status advances in sequence
+- invoice is created only after order completion
+- invoice moves to `PAID` after payment
+- reservation confirms/completes correctly
+- restaurant table status changes after reservation events
 
 ### Step 6. Kitchen workflow
 
@@ -275,8 +449,8 @@ Run targeted tests:
 
 ## 9. Notes for local testing
 
-- The project is set up to use local MongoDB through Docker Compose.
-- RabbitMQ is also started by Docker Compose.
+- MongoDB runs locally on `localhost:27017`.
+- RabbitMQ and Eureka are started by Docker Compose.
 - If you change credentials, update `.env` and the service environment variables together.
 - The services use Eureka automatically; you do not need to configure service discovery manually for normal local testing.
 
@@ -291,4 +465,3 @@ If you are presenting the project, explain these points:
 - immutable order snapshots
 - reservation overlap checking
 - billing from completed orders
-
