@@ -124,7 +124,7 @@ PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up -d --build
+docker compose up -d rabbitmq eureka-server
 docker compose ps
 ```
 
@@ -132,7 +132,7 @@ Bash:
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d rabbitmq eureka-server
 docker compose ps
 ```
 
@@ -179,19 +179,35 @@ Use one sufficiently long `JWT_SECRET` across every service. Different secrets m
 
 ## Run services locally
 
-Start Eureka first, then the gateway, followed by business services:
+Start the local services after MongoDB is running on `localhost:27017`:
 
 ```powershell
-.\mvnw.cmd -pl eureka-server -am spring-boot:run
-.\mvnw.cmd -pl api-gateway -am spring-boot:run
-.\mvnw.cmd -pl user-service -am spring-boot:run
-.\mvnw.cmd -pl restaurant-service -am spring-boot:run
-.\mvnw.cmd -pl reservation-service -am spring-boot:run
-.\mvnw.cmd -pl order-service -am spring-boot:run
-.\mvnw.cmd -pl billing-service -am spring-boot:run
+.\mvnw.cmd -f api-gateway/pom.xml spring-boot:run
+.\mvnw.cmd -f user-service/pom.xml spring-boot:run
+.\mvnw.cmd -f restaurant-service/pom.xml spring-boot:run
+.\mvnw.cmd -f reservation-service/pom.xml spring-boot:run
+.\mvnw.cmd -f order-service/pom.xml spring-boot:run
+.\mvnw.cmd -f billing-service/pom.xml spring-boot:run
 ```
 
-When services run on the host, set `MONGO_URI` to a host-reachable address such as `localhost:27017`. The Compose hostname `mongodb` only resolves inside the Compose network.
+If you need Eureka itself on Docker, keep `eureka-server` running with:
+
+```powershell
+docker compose up -d eureka-server
+```
+
+Useful URLs:
+
+- Eureka dashboard: `http://localhost:8761`
+- API Gateway: `http://localhost:8080`
+- User Service: `http://localhost:8081`
+- Restaurant Service: `http://localhost:8082`
+- Reservation Service: `http://localhost:8083`
+- Order Service: `http://localhost:8084`
+- Billing Service: `http://localhost:8085`
+- RabbitMQ management: `http://localhost:15672`
+
+When services run on the host, set `MONGO_URI` to `mongodb://localhost:27017/<db_name>` as needed. The Compose hostname `mongodb` only resolves inside the Compose network.
 
 ## Build and test
 
