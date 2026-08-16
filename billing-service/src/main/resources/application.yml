@@ -13,6 +13,9 @@ spring:
     username: ${RABBITMQ_DEFAULT_USER:dinepilot}
     password: ${RABBITMQ_DEFAULT_PASS:dinepilot}
 
+jwt:
+  secret: ${JWT_SECRET:change-this-to-a-long-random-secret-in-every-environment}
+
 eureka:
   client:
     service-url:

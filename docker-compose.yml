@@ -4,9 +4,6 @@ services:
     image: mongo:7
     container_name: dinepilot-mongodb
     restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-dinepilot}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-dinepilot}
     ports:
       - "${MONGO_PORT:-27017}:27017"
     volumes:
@@ -85,7 +82,7 @@ services:
     restart: unless-stopped
     environment:
       EUREKA_HOST: eureka-server
-      MONGO_URI: ${MONGO_URI_ORDER_SERVICE:-mongodb://dinepilot:dinepilot@mongodb:27017/order_db?authSource=admin}
+      MONGO_URI: ${MONGO_URI_ORDER_SERVICE:-mongodb://mongodb:27017/order_db}
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - eureka-server
@@ -102,7 +99,7 @@ services:
     restart: unless-stopped
     environment:
       EUREKA_HOST: eureka-server
-      MONGO_URI: ${MONGO_URI_RESERVATION_SERVICE:-mongodb://dinepilot:dinepilot@mongodb:27017/reservation_db?authSource=admin}
+      MONGO_URI: ${MONGO_URI_RESERVATION_SERVICE:-mongodb://mongodb:27017/reservation_db}
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - eureka-server
@@ -110,6 +107,25 @@ services:
       - restaurant-service
     ports:
       - "${RESERVATION_SERVICE_PORT:-8083}:8083"
+
+  billing-service:
+    build:
+      context: .
+      dockerfile: billing-service/Dockerfile
+    container_name: dinepilot-billing-service
+    restart: unless-stopped
+    environment:
+      EUREKA_HOST: eureka-server
+      MONGO_URI: ${MONGO_URI_BILLING_SERVICE:-mongodb://mongodb:27017/billing_db}
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - eureka-server
+      - mongodb
+      - rabbitmq
+      - order-service
+    ports:
+      - "${BILLING_SERVICE_PORT:-8085}:8085"
 
 volumes:
   mongo-data:
