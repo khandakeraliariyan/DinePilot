@@ -6,7 +6,7 @@ spring:
     name: restaurant-service
   data:
     mongodb:
-      uri: ${MONGO_URI:mongodb://dinepilot:dinepilot@localhost:27017/restaurant_db?authSource=admin}
+      uri: ${MONGO_URI:mongodb://localhost:27017/restaurant_db}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
