@@ -1,0 +1,89 @@
+{
+    "id": "dinepilot-local-2026",
+    "name": "DinePilot Local",
+    "values": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8080",
+            "enabled": true
+        },
+        {
+            "key": "customer_token",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "admin_token",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "kitchen_token",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "restaurant_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "category_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "menu_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "table_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "order_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "invoice_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "reservation_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "user_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "address_id",
+            "value": "",
+            "enabled": true
+        },
+        {
+            "key": "customer_email",
+            "value": "customer@example.com",
+            "enabled": true
+        },
+        {
+            "key": "admin_email",
+            "value": "admin@example.com",
+            "enabled": true
+        },
+        {
+            "key": "kitchen_email",
+            "value": "kitchen@example.com",
+            "enabled": true
+        }
+    ],
+    "_postman_variable_scope": "environment",
+    "_postman_exported_using": "GitHub Copilot",
+    "_postman_exported_at": "2026-08-17T00:00:00Z"
+}

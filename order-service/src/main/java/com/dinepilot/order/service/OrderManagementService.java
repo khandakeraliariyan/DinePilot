@@ -59,6 +59,10 @@ public class OrderManagementService {
         return toResponse(order);
     }
 
+    public OrderResponse getForInternal(String orderId) {
+        return toResponse(find(orderId));
+    }
+
     public OrderResponse cancel(String userId, String orderId) {
         Order order = find(orderId);
         if (!order.getUserId().equals(userId)) throw new ForbiddenException("This order belongs to another customer");

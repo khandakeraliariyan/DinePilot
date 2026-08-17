@@ -22,6 +22,11 @@ public class OrderController {
     @GetMapping("/{id}") public ApiResponse<OrderResponse> get(Authentication auth, @PathVariable String id) {
         return ApiResponse.success(orders.getForCustomer(auth.getName(), id));
     }
+    @GetMapping("/internal/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<OrderResponse> internalGet(@PathVariable String id) {
+        return ApiResponse.success(orders.getForInternal(id));
+    }
     @PatchMapping("/{id}/cancel") public ApiResponse<OrderResponse> cancel(Authentication auth, @PathVariable String id) {
         return ApiResponse.success("Order cancelled", orders.cancel(auth.getName(), id));
     }

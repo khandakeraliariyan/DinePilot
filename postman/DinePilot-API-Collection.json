@@ -1,0 +1,1632 @@
+{
+    "info": {
+        "_postman_id": "dinepilot-local-api-flow-2026",
+        "name": "DinePilot API - Local Test Flow",
+        "description": "Valid collection for the current DinePilot project. Before running the admin/kitchen steps, promote the accounts in MongoDB to RESTAURANT_ADMIN and KITCHEN as documented in the project README.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8080"
+        },
+        {
+            "key": "customer_token",
+            "value": ""
+        },
+        {
+            "key": "admin_token",
+            "value": ""
+        },
+        {
+            "key": "kitchen_token",
+            "value": ""
+        },
+        {
+            "key": "restaurant_id",
+            "value": ""
+        },
+        {
+            "key": "category_id",
+            "value": ""
+        },
+        {
+            "key": "menu_id",
+            "value": ""
+        },
+        {
+            "key": "table_id",
+            "value": ""
+        },
+        {
+            "key": "order_id",
+            "value": ""
+        },
+        {
+            "key": "invoice_id",
+            "value": ""
+        },
+        {
+            "key": "reservation_id",
+            "value": ""
+        },
+        {
+            "key": "user_id",
+            "value": ""
+        },
+        {
+            "key": "address_id",
+            "value": ""
+        },
+        {
+            "key": "customer_email",
+            "value": "customer@example.com"
+        },
+        {
+            "key": "admin_email",
+            "value": "admin@example.com"
+        },
+        {
+            "key": "kitchen_email",
+            "value": "kitchen@example.com"
+        }
+    ],
+    "item": [
+        {
+            "name": "01 Authentication",
+            "item": [
+                {
+                    "name": "Register Customer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Pass1234!\",\n  \"fullName\": \"Customer One\",\n  \"phone\": \"+8801700000000\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "register"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.test('Register success', function () { pm.expect(j.success).to.eql(true); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Customer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Pass1234!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.test('Token exists', function () { pm.expect(j.data.accessToken).to.be.a('string'); });",
+                                    "pm.environment.set('customer_token', j.data.accessToken);"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Admin",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"Pass1234!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.test('Token exists', function () { pm.expect(j.data.accessToken).to.be.a('string'); });",
+                                    "pm.environment.set('admin_token', j.data.accessToken);"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Kitchen",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{kitchen_email}}\",\n  \"password\": \"Pass1234!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.test('Token exists', function () { pm.expect(j.data.accessToken).to.be.a('string'); });",
+                                    "pm.environment.set('kitchen_token', j.data.accessToken);"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "02 Restaurant Setup",
+            "item": [
+                {
+                    "name": "Create Restaurant",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"DinePilot Bistro\",\n  \"description\": \"Demo restaurant\",\n  \"address\": {\n    \"line1\": \"12 Food Street\",\n    \"line2\": \"\",\n    \"city\": \"Dhaka\",\n    \"state\": \"Dhaka\",\n    \"postalCode\": \"1207\",\n    \"country\": \"Bangladesh\"\n  },\n  \"openingHours\": [],\n  \"active\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/restaurants",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "restaurants"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('restaurant_id', j.data.id);",
+                                    "pm.test('restaurant_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Category",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"name\": \"Main Course\",\n  \"description\": \"Primary dishes\",\n  \"displayOrder\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/categories",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "categories"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('category_id', j.data.id);",
+                                    "pm.test('category_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Menu Item",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"categoryId\": \"{{category_id}}\",\n  \"name\": \"Grilled Chicken Steak\",\n  \"description\": \"Served with veggies\",\n  \"price\": 850,\n  \"available\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/menu",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "menu"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('menu_id', j.data.id);",
+                                    "pm.test('menu_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Table",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"tableNumber\": \"T1\",\n  \"capacity\": 4\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/tables",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tables"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('table_id', j.data.id);",
+                                    "pm.test('table_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "03 Customer Profile & Address",
+            "item": [
+                {
+                    "name": "Get My Profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "if (j.data && j.data.id) { pm.environment.set('user_id', j.data.id); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Update My Profile",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"fullName\": \"Customer One Updated\",\n  \"phone\": \"+8801711111111\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Address",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"label\": \"Home\",\n  \"line1\": \"123 Main Street\",\n  \"line2\": \"Apt 4B\",\n  \"city\": \"Dhaka\",\n  \"state\": \"Dhaka\",\n  \"postalCode\": \"1205\",\n  \"country\": \"Bangladesh\",\n  \"defaultAddress\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me/addresses",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me",
+                                "addresses"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('address_id', j.data.id);",
+                                    "pm.test('address_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "List Addresses",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me/addresses",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me",
+                                "addresses"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Update Address",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"label\": \"Home Updated\",\n  \"line1\": \"123 Main Street\",\n  \"line2\": \"Apt 4B\",\n  \"city\": \"Dhaka\",\n  \"state\": \"Dhaka\",\n  \"postalCode\": \"1205\",\n  \"country\": \"Bangladesh\",\n  \"defaultAddress\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me/addresses/{{address_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me",
+                                "addresses",
+                                "{{address_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Delete Address",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me/addresses/{{address_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me",
+                                "addresses",
+                                "{{address_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "04 Cart & Orders",
+            "item": [
+                {
+                    "name": "View Cart",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/cart",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Add Item To Cart",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"foodId\": \"{{menu_id}}\",\n  \"quantity\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/cart/items",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Update Cart Item",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 3\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/cart/items/{{menu_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{menu_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Place Order",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('order_id', j.data.id);",
+                                    "pm.test('order_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Order History",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Order",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/orders/{{order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{order_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Cancel Order",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/orders/{{order_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{order_id}}",
+                                "cancel"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "05 Kitchen Workflow",
+            "item": [
+                {
+                    "name": "Assign Kitchen Restaurant",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"restaurantId\": \"{{restaurant_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/{{user_id}}/kitchen-restaurant",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "{{user_id}}",
+                                "kitchen-restaurant"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Kitchen Profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{kitchen_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "me"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "if (j.data && j.data.id) { pm.environment.set('user_id', j.data.id); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "List Kitchen Orders",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{kitchen_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/kitchen/orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "kitchen",
+                                "orders"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Accept Order",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{kitchen_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/kitchen/orders/{{order_id}}/accept",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "kitchen",
+                                "orders",
+                                "{{order_id}}",
+                                "accept"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Mark Preparing",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{kitchen_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/kitchen/orders/{{order_id}}/preparing",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "kitchen",
+                                "orders",
+                                "{{order_id}}",
+                                "preparing"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Mark Ready",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{kitchen_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/kitchen/orders/{{order_id}}/ready",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "kitchen",
+                                "orders",
+                                "{{order_id}}",
+                                "ready"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Mark Completed",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{kitchen_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/kitchen/orders/{{order_id}}/completed",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "kitchen",
+                                "orders",
+                                "{{order_id}}",
+                                "completed"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "06 Billing",
+            "item": [
+                {
+                    "name": "Generate Invoice",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/invoices/orders/{{order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "invoices",
+                                "orders",
+                                "{{order_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('invoice_id', j.data.id);",
+                                    "pm.test('invoice_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "List My Invoices",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/invoices/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "invoices",
+                                "me"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Invoice",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/invoices/{{invoice_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "invoices",
+                                "{{invoice_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Pay Invoice",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/invoices/{{invoice_id}}/pay",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "invoices",
+                                "{{invoice_id}}",
+                                "pay"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "07 Reservations",
+            "item": [
+                {
+                    "name": "Book Reservation",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tableId\": \"{{table_id}}\",\n  \"partySize\": 4,\n  \"reservedFor\": \"2027-09-01T19:00:00Z\",\n  \"notes\": \"Anniversary dinner\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });",
+                                    "const j = pm.response.json();",
+                                    "pm.environment.set('reservation_id', j.data.id);",
+                                    "pm.test('reservation_id saved', function () { pm.expect(j.data.id).to.be.a('string'); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Reservation History",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Reservation",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations/{{reservation_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations",
+                                "{{reservation_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Cancel Reservation - Customer",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{customer_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations/{{reservation_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations",
+                                "{{reservation_id}}",
+                                "cancel"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "List Restaurant Reservations",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations/restaurant/{{restaurant_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations",
+                                "restaurant",
+                                "{{restaurant_id}}"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Confirm Reservation",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations/restaurant/{{reservation_id}}/confirm",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations",
+                                "restaurant",
+                                "{{reservation_id}}",
+                                "confirm"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Complete Reservation",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations/restaurant/{{reservation_id}}/complete",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations",
+                                "restaurant",
+                                "{{reservation_id}}",
+                                "complete"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Cancel Reservation - Restaurant",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reservations/restaurant/{{reservation_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reservations",
+                                "restaurant",
+                                "{{reservation_id}}",
+                                "cancel"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status is 2xx', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
